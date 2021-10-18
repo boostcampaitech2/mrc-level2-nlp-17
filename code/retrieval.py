@@ -19,6 +19,13 @@ from datasets import (
     concatenate_datasets,
 )
 
+from arguments import (
+    ModelArguments,
+    DataTrainingArguments,
+)
+
+from transformers import HfArgumentParser, TrainingArguments, AutoTokenizer
+
 
 @contextmanager
 def timer(name):
@@ -390,28 +397,14 @@ class SparseRetrieval:
 
 if __name__ == "__main__":
 
-    import argparse
-
-    parser = argparse.ArgumentParser(description="")
-    parser.add_argument(
-        "--dataset_name", metavar="./data/train_dataset", type=str, help=""
+    parser = HfArgumentParser(
+        (ModelArguments, DataTrainingArguments, TrainingArguments)
     )
-    parser.add_argument(
-        "--model_name_or_path",
-        metavar="bert-base-multilingual-cased",
-        type=str,
-        help="",
-    )
-    parser.add_argument("--data_path", metavar="./data", type=str, help="")
-    parser.add_argument(
-        "--context_path", metavar="wikipedia_documents", type=str, help=""
-    )
-    parser.add_argument("--use_faiss", metavar=False, type=bool, help="")
-
-    args = parser.parse_args()
+    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     # Test sparse
-    org_dataset = load_from_disk(args.dataset_name)
+    print(data_args.dataset_name)
+    org_dataset = load_from_disk(data_args.dataset_name)
     full_ds = concatenate_datasets(
         [
             org_dataset["train"].flatten_indices(),
@@ -421,22 +414,22 @@ if __name__ == "__main__":
     print("*" * 40, "query dataset", "*" * 40)
     print(full_ds)
 
-    from transformers import AutoTokenizer
-
     tokenizer = AutoTokenizer.from_pretrained(
-        args.model_name_or_path,
+        model_args.model_name_or_path,
         use_fast=False,
     )
 
     retriever = SparseRetrieval(
         tokenize_fn=tokenizer.tokenize,
-        data_path=args.data_path,
-        context_path=args.context_path,
+        data_path=data_args.data_path,
+        context_path=data_args.context_path,
     )
+
+    retriever.get_sparse_embedding()
 
     query = "대통령을 포함한 미국의 행정부 견제권을 갖는 국가 기관은?"
 
-    if args.use_faiss:
+    if data_args.use_faiss:
 
         # test single query
         with timer("single query by faiss"):
