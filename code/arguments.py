@@ -28,8 +28,8 @@ class ModelArguments:
     )
 
     retrieval_model: str = field(
-        default='SparseRetrieval',
-        metadata={"help": "Using 'SparseRetrieval', 'DenseRetrieval' for retieval"}
+        default="SparseRetrieval",
+        metadata={"help": "Using 'SparseRetrieval', 'DenseRetrieval' for retieval"},
     )
 
 
@@ -38,6 +38,7 @@ class DataTrainingArguments:
     """
     Arguments pertaining to what data we are going to input our model for training and eval.
     """
+
     data_path: Optional[str] = field(
         default="../data",
         metadata={"help": "data path"},
@@ -96,11 +97,14 @@ class DataTrainingArguments:
         default=64, metadata={"help": "Define how many clusters to use for faiss."}
     )
     top_k_retrieval: int = field(
-        default=1,
+        default=2,
         metadata={
             "help": "Define how many top-k passages to retrieve based on similarity."
         },
     )
     use_faiss: bool = field(
         default=False, metadata={"help": "Whether to build with faiss"}
+    )
+    do_retrieval_example: bool = field(
+        default=False, metadata={"help": "To Show retrieval example"}
     )
