@@ -97,7 +97,7 @@ class DataTrainingArguments:
         default=64, metadata={"help": "Define how many clusters to use for faiss."}
     )
     top_k_retrieval: int = field(
-        default=2,
+        default=5,
         metadata={
             "help": "Define how many top-k passages to retrieve based on similarity."
         },

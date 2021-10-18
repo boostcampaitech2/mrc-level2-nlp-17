@@ -93,7 +93,6 @@ def main():
         config=config,
     )
 
-    print("retrieval하기 전 데이터셋 : ", datasets)
     # True일 경우 : run passage retrieval
     if data_args.eval_retrieval:
         if model_args.retrieval_model == "SparseRetrieval":
@@ -103,8 +102,6 @@ def main():
                 training_args,
                 data_args,
             )
-
-    print("retrieval하기 전 데이터셋 : ", datasets)
 
     # eval or predict mrc model
     if training_args.do_eval or training_args.do_predict:
@@ -164,6 +161,7 @@ def run_sparse_retrieval(
     datasets = DatasetDict({"validation": Dataset.from_pandas(df, features=f)})
     return datasets
 
+
 def run_dense_retrieval(
     tokenize_fn: Callable[[str], List[str]],
     datasets: DatasetDict,
@@ -173,6 +171,7 @@ def run_dense_retrieval(
     context_path: str = "wikipedia_documents.json",
 ) -> DatasetDict:
     pass
+
 
 def run_mrc(
     data_args: DataTrainingArguments,
@@ -211,7 +210,7 @@ def run_mrc(
             stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            #return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            # return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 
