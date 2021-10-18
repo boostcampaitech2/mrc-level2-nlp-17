@@ -93,6 +93,7 @@ def main():
         config=config,
     )
 
+    print("retrieval하기 전 데이터셋 : ", datasets)
     # True일 경우 : run passage retrieval
     if data_args.eval_retrieval:
         if model_args.retrieval_model == "SparseRetrieval":
@@ -102,6 +103,8 @@ def main():
                 training_args,
                 data_args,
             )
+
+    print("retrieval하기 전 데이터셋 : ", datasets)
 
     # eval or predict mrc model
     if training_args.do_eval or training_args.do_predict:
