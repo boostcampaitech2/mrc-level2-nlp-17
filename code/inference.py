@@ -95,12 +95,13 @@ def main():
 
     # True일 경우 : run passage retrieval
     if data_args.eval_retrieval:
-        datasets = run_sparse_retrieval(
-            tokenizer.tokenize,
-            datasets,
-            training_args,
-            data_args,
-        )
+        if model_args.retrieval_model == "SparseRetrieval":
+            datasets = run_sparse_retrieval(
+                tokenizer.tokenize,
+                datasets,
+                training_args,
+                data_args,
+            )
 
     # eval or predict mrc model
     if training_args.do_eval or training_args.do_predict:
@@ -160,6 +161,15 @@ def run_sparse_retrieval(
     datasets = DatasetDict({"validation": Dataset.from_pandas(df, features=f)})
     return datasets
 
+def run_dense_retrieval(
+    tokenize_fn: Callable[[str], List[str]],
+    datasets: DatasetDict,
+    training_args: TrainingArguments,
+    data_args: DataTrainingArguments,
+    data_path: str = "../data",
+    context_path: str = "wikipedia_documents.json",
+) -> DatasetDict:
+    pass
 
 def run_mrc(
     data_args: DataTrainingArguments,

@@ -27,12 +27,26 @@ class ModelArguments:
         },
     )
 
+    retrieval_model: str = field(
+        default='SparseRetrieval',
+        metadata={"help": "Using 'SparseRetrieval', 'DenseRetrieval' for retieval"}
+    )
+
 
 @dataclass
 class DataTrainingArguments:
     """
     Arguments pertaining to what data we are going to input our model for training and eval.
     """
+    data_path: Optional[str] = field(
+        default="../data",
+        metadata={"help": "data path"},
+    )
+
+    context_path: Optional[str] = field(
+        default="wikipedia_documents.json",
+        metadata={"help": "data path"},
+    )
 
     dataset_name: Optional[str] = field(
         default="../data/train_dataset",
