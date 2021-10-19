@@ -33,6 +33,9 @@ from arguments import (
 
 from transformers import HfArgumentParser, TrainingArguments, AutoTokenizer, set_seed
 
+import wandb
+import datetime
+from dateutil.tz import gettz
 
 @contextmanager
 def timer(name):
@@ -488,9 +491,10 @@ def eval_retrieval(model_args, data_args, training_args, datasets):
             data_args.top_k_retrieval, data_args.use_faiss
         )
     )
+    train_accuracy = get_retrieval_accuracy(before_dataset, after_dataset)
     print(
         "retrieval_accuracy :",
-        get_retrieval_accuracy(before_dataset, after_dataset),
+        train_accuracy,
     )
 
     before_dataset = datasets["validation"]
@@ -509,11 +513,13 @@ def eval_retrieval(model_args, data_args, training_args, datasets):
             data_args.top_k_retrieval, data_args.use_faiss
         )
     )
+    val_accuracy = get_retrieval_accuracy(before_dataset, after_dataset)
     print(
         "retrieval_accuracy :",
-        get_retrieval_accuracy(before_dataset, after_dataset),
+        val_accuracy,
     )
-
+    wandb.log({"Train/accuracy": train_accuracy,
+               "Val/accuracy": val_accuracy})
 
 if __name__ == "__main__":
 
@@ -527,6 +533,22 @@ if __name__ == "__main__":
     org_dataset = load_from_disk(data_args.dataset_name)
 
     if training_args.do_eval:
+        # wandb
+        wandb.init(project="mrc-level2-nlp-retriever")
+
+        # 파라미터 초기화
+        wandb.config.update(model_args)
+        wandb.config.update(data_args)
+        #wandb.config.update(training_args)
+
+        # Retriever | 21-10-01 00:00 | Retriever Model Name
+        wandb.run.name = (
+            "Retriever | " +
+            datetime.datetime.now(gettz("Asia/Seoul")).strftime("%y-%m-%d %H:%M")
+            + " | " + model_args.retrieval_model
+        )
+        wandb.run.save()
+
         eval_retrieval(model_args, data_args, training_args, org_dataset)
 
     if data_args.do_retrieval_example:
@@ -580,3 +602,4 @@ if __name__ == "__main__":
 
             with timer("single query by exhaustive search"):
                 scores, indices = retriever.retrieve(query)
+
