@@ -97,7 +97,7 @@ class DataTrainingArguments:
         default=64, metadata={"help": "Define how many clusters to use for faiss."}
     )
     top_k_retrieval: int = field(
-        default=2,
+        default=10,
         metadata={
             "help": "Define how many top-k passages to retrieve based on similarity."
         },
@@ -116,4 +116,7 @@ class DataTrainingArguments:
         metadata={
             "help": "When Train Dense retrieval, input positive and negative passage num per one question"
         },
+    )
+    pretrain_dense_encoder: bool = field(
+        default=False, metadata={"help": "whether to pretrain dense encoder"}
     )

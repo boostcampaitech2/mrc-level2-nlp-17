@@ -6,6 +6,7 @@ import pickle
 import numpy as np
 import pandas as pd
 import re
+import random
 from pprint import pprint
 
 from tqdm.auto import tqdm, trange
@@ -416,10 +417,7 @@ class SparseRetrieval:
 
 class DenseRetrieval:
     def __init__(
-        self,
-        model_args,
-        data_args,
-        training_args,  # dataset  # test code
+        self, model_args, data_args, training_args, dataset  # test code
     ) -> NoReturn:
         self.tokenizer = AutoTokenizer.from_pretrained(
             model_args.tokenizer_name
@@ -446,6 +444,7 @@ class DenseRetrieval:
             else model_args.model_name_or_path,
         )
 
+        print(model_args.model_name_or_path)
         self.p_encoder = AutoModel.from_pretrained(
             self.p_encoder_path
             if not data_args.do_train_dense_retrieval
@@ -464,10 +463,15 @@ class DenseRetrieval:
         ) as f:
             wiki = json.load(f)
 
+        # self.contexts = list(
+        #     dict.fromkeys([v["text"] for v in wiki.values()])
+        # )  # set 은 매번 순서가 바뀌므로
         self.contexts = list(
-            dict.fromkeys([v["text"] for v in wiki.values()])
-        )  # set 은 매번 순서가 바뀌므로
-        # self.contexts = dataset["validation"]["context"]  # test code
+            dict.fromkeys([v["context"] for v in dataset["validation"]])
+        )
+        # self.contexts.extend(
+        #     list(dict.fromkeys([v["context"] for v in dataset["train"]]))
+        # )  # test code
         print(f"Lengths of unique contexts : {len(self.contexts)}")
         # self.ids = list(range(len(self.contexts)))
 
@@ -578,7 +582,9 @@ class DenseRetrieval:
             with open(tfidfv_path, "rb") as file:
                 self.tfidfv = pickle.load(file)
             print("Embedding pickle load.")
-        else:
+        if (
+            not (os.path.isfile(emd_path) and os.path.isfile(tfidfv_path))
+        ) or self.data_args.do_train_dense_retrieval:
             print("Build passage embedding")
             self.p_sparse_embedding = self.tfidfv.fit_transform(self.contexts)
             print(self.p_sparse_embedding.shape)
@@ -588,7 +594,7 @@ class DenseRetrieval:
                 pickle.dump(self.tfidfv, file)
             print("Embedding pickle saved.")
 
-    def get_dense_embedding(self, is_train=False) -> NoReturn:
+    def get_dense_embedding(self):
         """
         Summary:
             Passage Embedding을 만들고
@@ -605,9 +611,10 @@ class DenseRetrieval:
                 self.p_dense_embedding = pickle.load(file)
                 print(self.p_dense_embedding.shape)
             print("Embedding pickle load.")
-        if (not os.path.isfile(emd_path)) or is_train:
+        if (not os.path.isfile(emd_path)) or self.data_args.do_train_dense_retrieval:
             print("Build passage embedding")
             # self.p_encoder = self.p_encoder.to("cpu")
+            self.p_encoder.eval()
             with torch.no_grad():
                 p = self.tokenizer(
                     self.contexts[0],
@@ -643,7 +650,7 @@ class DenseRetrieval:
                 pickle.dump(self.p_dense_embedding, file)
             print("Embedding pickle saved.")
 
-    def prepare_negative(self, dataset, p_with_n_num):
+    def prepare_negative(self, dataset, p_with_n_num, use_tfidf_top_k_negativ):
 
         questions = dataset["question"]
         p_with_n_contexts = []
@@ -651,20 +658,29 @@ class DenseRetrieval:
             query = data["question"]
             context = data["context"]
 
-            query_emb = self.tfidfv.transform([query])
-            result = query_emb * self.p_sparse_embedding.T
-            if not isinstance(result, np.ndarray):
-                result = result.toarray()
+            if use_tfidf_top_k_negativ:
+                query_emb = self.tfidfv.transform([query])
+                result = query_emb * self.p_sparse_embedding.T
+                if not isinstance(result, np.ndarray):
+                    result = result.toarray()
 
-            sorted_result = np.argsort(result.squeeze())[::-1]
-            # doc_score = result.squeeze()[sorted_result].tolist()[:p_with_n_num]
-            doc_indices = sorted_result.tolist()
-            negative_contexts = [
-                self.contexts[idx]
-                for idx in doc_indices
-                if self.contexts[idx] != context
-            ]
-            negative_contexts = negative_contexts[: p_with_n_num - 1]
+                sorted_result = np.argsort(result.squeeze())[::-1]
+                # doc_score = result.squeeze()[sorted_result].tolist()[:p_with_n_num]
+                doc_indices = sorted_result.tolist()
+                negative_contexts = [
+                    self.contexts[idx]
+                    for idx in doc_indices
+                    if self.contexts[idx] != context
+                ]
+                negative_contexts = negative_contexts[: p_with_n_num - 1]
+
+            else:
+                negative_contexts = [
+                    c
+                    for c in random.choices(self.contexts, k=p_with_n_num)
+                    if c != context
+                ]
+                negative_contexts = negative_contexts[: p_with_n_num - 1]
             assert len(negative_contexts) == (
                 p_with_n_num - 1
             ), "len(negative_contexts) : {}".format(len(negative_contexts))
@@ -672,7 +688,6 @@ class DenseRetrieval:
             assert (
                 context not in negative_contexts
             ), "ground : {}, negative : {}".format(context, negative_contexts)
-
             p_with_n_contexts.append(context)
             p_with_n_contexts.extend(negative_contexts)
 
@@ -701,7 +716,8 @@ class DenseRetrieval:
             -1, p_with_n_num, max_len
         )
 
-        print(p_seqs["input_ids"].size())
+        print("p_seqs['input_ids'].size()", p_seqs["input_ids"].size())
+        print("q_seqs['input_ids'].size()", q_seqs["input_ids"].size())
 
         return TensorDataset(
             p_seqs["input_ids"],
@@ -721,12 +737,10 @@ class DenseRetrieval:
 
         batch_size = args.per_device_train_batch_size
 
-        train_dataset = dataset["train"]  # test code
-        prepare_train_dataset = self.prepare_negative(train_dataset, p_with_n_num)
-
-        train_dataloader = DataLoader(prepare_train_dataset, batch_size=batch_size)
-
-        no_decay = ["bias", "LayerNorm.weight"]
+        no_decay = [
+            "bias",
+            "LayerNorm.weight",
+        ]  # ["bias", "LayerNorm.weight"] # test code
         optimizer_grouped_parameters = [
             {
                 "params": [
@@ -764,10 +778,32 @@ class DenseRetrieval:
         optimizer = AdamW(
             optimizer_grouped_parameters, lr=args.learning_rate, eps=args.adam_epsilon
         )
+
+        train_dataset = dataset["validation"]  # test code
+        dataset_list = []
+        dataset_list.append(
+            self.prepare_negative(
+                train_dataset, p_with_n_num, use_tfidf_top_k_negativ=False
+            )
+        )
+        dataset_list.append(
+            self.prepare_negative(
+                train_dataset, p_with_n_num, use_tfidf_top_k_negativ=True
+            )
+        )
+        print(len(dataset_list))
+        prepare_train_dataset = torch.utils.data.ConcatDataset(dataset_list)
+        print("prepare_train_dataset", len(prepare_train_dataset))
+
+        train_dataloader = DataLoader(prepare_train_dataset, batch_size=batch_size)
+
         t_total = len(train_dataloader)
+
         scheduler = get_linear_schedule_with_warmup(
             optimizer, num_warmup_steps=args.warmup_steps, num_training_steps=t_total
         )
+
+        print("t_total", t_total)
 
         global_step = 0
 
@@ -775,9 +811,11 @@ class DenseRetrieval:
         self.q_encoder.zero_grad()
         torch.cuda.empty_cache()
 
+        args.num_train_epochs = 20  # test code
         train_iterator = trange(int(args.num_train_epochs), desc="Epoch")
 
         for _ in train_iterator:
+
             with tqdm(train_dataloader, unit="batch") as tepoch:
                 for batch in tepoch:
                     self.p_encoder.train()
@@ -811,15 +849,19 @@ class DenseRetrieval:
                     q_outputs = self.q_encoder(**q_inputs)
 
                     p_outputs = p_outputs[1].view(batch_size, -1, p_with_n_num)
+
                     q_outputs = q_outputs[1].view(batch_size, 1, -1)
 
                     sim_scores = torch.bmm(
                         q_outputs, p_outputs
                     ).squeeze()  # batch matrix multiplication
+
                     sim_scores = sim_scores.view(batch_size, -1)
+
                     sim_scores = torch.nn.functional.log_softmax(sim_scores, dim=1)
 
                     loss = torch.nn.functional.nll_loss(sim_scores, targets)
+
                     tepoch.set_postfix(loss=f"{str(loss.item())}")
 
                     loss.backward()
@@ -831,8 +873,8 @@ class DenseRetrieval:
 
                     global_step += 1
 
-                    torch.cuda.empty_cache()
                     del p_inputs, q_inputs
+                    torch.cuda.empty_cache()
 
         p_output_dir = os.path.join(args.output_dir, "p_encoder")
         self.p_encoder.save_pretrained(p_output_dir)
@@ -840,11 +882,10 @@ class DenseRetrieval:
         q_output_dir = os.path.join(args.output_dir, "q_encoder")
         self.q_encoder.save_pretrained(q_output_dir)
 
-        self.build_faiss(is_train=True)
+        self.get_dense_embedding()
+        self.build_faiss()
 
-        self.get_dense_embedding(is_train=True)
-
-    def build_faiss(self, num_clusters=64, is_train=False):
+    def build_faiss(self, num_clusters=64):
         """
         Summary:
             속성으로 저장되어 있는 Passage Embedding을
@@ -865,8 +906,11 @@ class DenseRetrieval:
             print("Load Saved Faiss Indexer.")
             self.indexer = faiss.read_index(indexer_path)
 
-        if (not os.path.isfile(indexer_path)) or is_train:
-            p_emb = self.p_dense_embedding.astype(np.float32).toarray()
+        if (
+            not os.path.isfile(indexer_path)
+        ) or self.data_args.do_train_dense_retrieval:
+
+            p_emb = self.p_dense_embedding.numpy()
             emb_dim = p_emb.shape[-1]
 
             num_clusters = num_clusters
@@ -883,7 +927,6 @@ class DenseRetrieval:
     def get_relevant_doc(self, query: str, k: Optional[int] = 1) -> Tuple[List, List]:
         torch.cuda.empty_cache()
         with torch.no_grad():
-            self.p_encoder.eval()
             self.q_encoder.eval()
 
             q_seqs_val = self.tokenizer(
@@ -912,7 +955,6 @@ class DenseRetrieval:
     ) -> Tuple[List, List]:
         torch.cuda.empty_cache()
         with torch.no_grad():
-            self.p_encoder.eval()
             self.q_encoder.eval()
 
             q = self.tokenizer(
@@ -1125,7 +1167,9 @@ def run_dense_retrieval(
     use_train_or_validation: str = "validation",
 ) -> DatasetDict:
     # Query에 맞는 Passage들을 Retrieval 합니다.
-    retriever = DenseRetrieval(model_args, data_args, training_args)
+    retriever = DenseRetrieval(
+        model_args, data_args, training_args, datasets
+    )  # test code
 
     retriever.get_sparse_embedding()
     retriever.get_dense_embedding()
@@ -1167,6 +1211,10 @@ def get_retrieval_accuracy(before_dataset, after_dataset):
     before_dataset = before_dataset.sort("id")
     after_dataset = after_dataset.sort("id")
 
+    # test code
+    print("ground : ", before_dataset[0])
+    print("prediction : ", after_dataset[0])
+
     t = 0
     f = 0
     for i in range(len(before_dataset)):
@@ -1207,7 +1255,7 @@ def eval_retrieval(model_args, data_args, training_args, datasets):
     print(
         "retrieval_accuracy :",
         get_retrieval_accuracy(before_dataset["train"], after_dataset),
-    )
+    )  # test code
 
     before_dataset = datasets
     # True일 경우 : run passage retrieval
@@ -1239,11 +1287,17 @@ if __name__ == "__main__":
     )
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
+    training_args.evaluation_strategy = "epoch"
+    training_args.learning_rate = 2e-5
+    training_args.weight_decay = 0.01
+
+    print(training_args.per_device_train_batch_size)
+
     org_dataset = load_from_disk(data_args.dataset_name)
 
     if data_args.do_train_dense_retrieval:
         denseretrieval = DenseRetrieval(
-            model_args, data_args, training_args
+            model_args, data_args, training_args, org_dataset
         )  # test code
         denseretrieval.train(org_dataset)
 
