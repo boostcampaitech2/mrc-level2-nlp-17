@@ -1,1 +1,5 @@
 data
+__pycache__
+models
+outputs
+.vscode
