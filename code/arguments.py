@@ -108,15 +108,21 @@ class DataTrainingArguments:
     do_retrieval_example: bool = field(
         default=False, metadata={"help": "To Show retrieval example"}
     )
+    pretrain_dense_encoder: bool = field(
+        default=False, metadata={"help": "whether to pretrain dense encoder"}
+    )
+
     do_train_dense_retrieval: bool = field(
         default=False, metadata={"help": "To Train Dense retrieval"}
     )
+
+    use_pretrained_dense_encoder: bool = field(
+        default=False, metadata={"help": "use pretrained dense encoder"}
+    )
+
     p_with_n_num: int = field(
-        default=3,
+        default=20,
         metadata={
             "help": "When Train Dense retrieval, input positive and negative passage num per one question"
         },
-    )
-    pretrain_dense_encoder: bool = field(
-        default=False, metadata={"help": "whether to pretrain dense encoder"}
     )
