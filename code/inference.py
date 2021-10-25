@@ -103,12 +103,13 @@ def main():
             datasets=datasets,
             training_args=training_args,
             data_args=data_args,
-            model_args=model_args
+            model_args=model_args,
         )
 
     # eval or predict mrc model
     if training_args.do_eval or training_args.do_predict:
         run_mrc(data_args, training_args, model_args, datasets, tokenizer, model)
+
 
 def run_retrieval(
     tokenize_fn: Callable[[str], List[str]],
@@ -121,11 +122,7 @@ def run_retrieval(
 ) -> DatasetDict:
 
     # Query에 맞는 Passage들을 Retrieval 합니다.
-    retriever = get_retriever(
-        retrieval_model=model_args.retrieval_model,
-        tokenize_fn=tokenize_fn,
-        data_path=data_path,
-        context_path=context_path)
+    retriever = get_retriever(model_args, data_args, training_args)
 
     retriever.get_embedding()
 
@@ -167,6 +164,7 @@ def run_retrieval(
     datasets = DatasetDict({"validation": Dataset.from_pandas(df, features=f)})
     return datasets
 
+
 def run_mrc(
     data_args: DataTrainingArguments,
     training_args: TrainingArguments,
@@ -204,7 +202,7 @@ def run_mrc(
             stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            return_token_type_ids=False,  # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 

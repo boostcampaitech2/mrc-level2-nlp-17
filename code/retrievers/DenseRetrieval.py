@@ -6,6 +6,9 @@ import numpy as np
 import pandas as pd
 import random
 from pprint import pprint
+import GPUtil
+import gc
+import sys
 
 from tqdm.auto import tqdm, trange
 from typing import List, Tuple, NoReturn, Optional, Union, Callable
@@ -54,6 +57,9 @@ class DenseRetrieval:
         self.data_args = data_args
         self.training_args = training_args
 
+        if model_args.is_roberta:
+            self.data_args.data_path = os.path.join(self.data_args.data_path, "roberta")
+
         assert not (
             data_args.pretrain_dense_encoder and data_args.use_pretrained_dense_encoder
         ), "pretrain_dense_encoder 와 use_pretrained_dense_encoder은 동시에 True가 될 수 없습니다."
@@ -70,29 +76,37 @@ class DenseRetrieval:
             else model_args.model_name_or_path,
         )
 
-        if data_args.do_train_dense_retrieval:
-            if data_args.use_pretrained_dense_encoder:
-                model_name_or_path = os.path.join(
-                    training_args.output_dir,
-                    "dense_encoder/pretrain",
-                )
-                self.p_encoder_path = os.path.join(model_name_or_path, "p_encoder")
-                self.q_encoder_path = os.path.join(model_name_or_path, "q_encoder")
-            else:
-                model_name_or_path = model_args.model_name_or_path
-                self.p_encoder_path = model_name_or_path
-                self.q_encoder_path = model_name_or_path
+        if training_args.do_predict:
+            model_name_or_path = os.path.join(
+                model_args.model_name_or_path,
+                "dense_encoder",
+            )
+            self.p_encoder_path = os.path.join(model_name_or_path, "p_encoder")
+            self.q_encoder_path = os.path.join(model_name_or_path, "q_encoder")
         else:
-            if data_args.pretrain_dense_encoder:
-                model_name_or_path = model_args.model_name_or_path
-                self.p_encoder_path = model_name_or_path
-                self.q_encoder_path = model_name_or_path
+            if data_args.do_train_dense_retrieval:
+                if data_args.use_pretrained_dense_encoder:
+                    model_name_or_path = os.path.join(
+                        training_args.output_dir,
+                        "dense_encoder/pretrain",
+                    )
+                    self.p_encoder_path = os.path.join(model_name_or_path, "p_encoder")
+                    self.q_encoder_path = os.path.join(model_name_or_path, "q_encoder")
+                else:
+                    model_name_or_path = model_args.model_name_or_path
+                    self.p_encoder_path = model_name_or_path
+                    self.q_encoder_path = model_name_or_path
             else:
-                model_name_or_path = os.path.join(
-                    training_args.output_dir, "dense_encoder"
-                )
-                self.p_encoder_path = os.path.join(model_name_or_path, "p_encoder")
-                self.q_encoder_path = os.path.join(model_name_or_path, "q_encoder")
+                if data_args.pretrain_dense_encoder:
+                    model_name_or_path = model_args.model_name_or_path
+                    self.p_encoder_path = model_name_or_path
+                    self.q_encoder_path = model_name_or_path
+                else:
+                    model_name_or_path = os.path.join(
+                        training_args.output_dir, "dense_encoder"
+                    )
+                    self.p_encoder_path = os.path.join(model_name_or_path, "p_encoder")
+                    self.q_encoder_path = os.path.join(model_name_or_path, "q_encoder")
 
         print("load_encoder from ", self.p_encoder_path)
         self.p_encoder = BertEncoder.from_pretrained(
@@ -210,6 +224,56 @@ class DenseRetrieval:
                 pickle.dump(self.tfidfv, file)
             print("Embedding pickle saved.")
 
+    def tokenize_hleper(self, dataset):
+        p = self.tokenizer(
+            [dataset[0]],
+            padding="max_length",
+            truncation=True,
+            return_tensors="pt",
+            return_token_type_ids=not self.model_args.is_roberta,
+        ).to(self.training_args.device)
+
+        temp_p = self.tokenizer(
+            [dataset[1]],
+            padding="max_length",
+            truncation=True,
+            return_tensors="pt",
+            return_token_type_ids=not self.model_args.is_roberta,
+        ).to(self.training_args.device)
+
+        return_dataset = {}
+        for key in p.keys():
+            return_dataset[key] = torch.stack((p[key], temp_p[key]), axis=0).squeeze()
+
+        assert torch.equal(
+            p["input_ids"][0], return_dataset["input_ids"][0]
+        ) and torch.equal(
+            temp_p["input_ids"][0], return_dataset["input_ids"][-1]
+        ), "{} == {} and {} == {}".format(
+            p["input_ids"],
+            return_dataset["input_ids"][0],
+            temp_p["input_ids"],
+            return_dataset["input_ids"][-1],
+        )
+
+        for c in tqdm(dataset[2:]):
+            temp_p = self.tokenizer(
+                [c],
+                padding="max_length",
+                truncation=True,
+                return_tensors="pt",
+                return_token_type_ids=not self.model_args.is_roberta,
+            ).to(self.training_args.device)
+
+            for key in p.keys():
+                return_dataset[key] = torch.cat(
+                    (return_dataset[key], temp_p[key]), axis=0
+                )
+
+            assert torch.equal(temp_p["input_ids"][0], return_dataset["input_ids"][-1])
+
+        return return_dataset
+
     def get_dense_embedding(self):
         print("get_dense_embedding")
         # Pickle을 저장합니다.
@@ -230,6 +294,7 @@ class DenseRetrieval:
                     padding="max_length",
                     truncation=True,
                     return_tensors="pt",
+                    return_token_type_ids=not self.model_args.is_roberta,
                 ).to(self.training_args.device)
                 p_embs1 = self.p_encoder(**p).to("cpu").numpy()
 
@@ -238,6 +303,7 @@ class DenseRetrieval:
                     padding="max_length",
                     truncation=True,
                     return_tensors="pt",
+                    return_token_type_ids=not self.model_args.is_roberta,
                 ).to(self.training_args.device)
                 temp_p_embs = self.p_encoder(**temp_p).to("cpu").numpy()
 
@@ -253,6 +319,7 @@ class DenseRetrieval:
                         padding="max_length",
                         truncation=True,
                         return_tensors="pt",
+                        return_token_type_ids=not self.model_args.is_roberta,
                     ).to(self.training_args.device)
                     temp_p_embs = self.p_encoder(**temp_p).to("cpu").numpy()
                     p_embs = np.concatenate((p_embs, temp_p_embs), axis=0)
@@ -274,6 +341,9 @@ class DenseRetrieval:
     ):
         print("start prepare_negative")
 
+        # 너무 데이터가 많은 경우 시간이 오르걸리므로 max_dataset_num으로 제한
+        max_dataset_num = self.data_args.pretrain_max_dataset_num
+
         if pretrain_dense_encoder and use_tfidf_top_k_negativ:
             print("pretrain을 하는 경우 negative context를 준비할 때 tfidf를 사용하지 않음")
             use_tfidf_top_k_negativ = False
@@ -291,12 +361,12 @@ class DenseRetrieval:
             if os.path.isfile(pretrain_path):
                 with open(pretrain_path, "rb") as file:
                     load_dataset = pickle.load(file)
-                    assert len(load_dataset) == len(
-                        dataset
+                    assert len(load_dataset) == min(
+                        len(dataset), max_dataset_num
                     ), "{} != {} preprocessing_for_ict_negative.bin 파일을 삭제해 주세요".format(
                         len(load_dataset), len(dataset)
                     )
-                    return load_dataset
+                return load_dataset
         else:
             if use_tfidf_top_k_negativ:
                 if os.path.isfile(tfidf_path):
@@ -307,7 +377,7 @@ class DenseRetrieval:
                         ), "{} != {} tfidf_negative.bin 파일을 삭제해 주세요".format(
                             len(load_dataset), len(dataset)
                         )
-                        return load_dataset
+                    return load_dataset
             else:
                 if os.path.isfile(random_path):
                     with open(random_path, "rb") as file:
@@ -317,9 +387,9 @@ class DenseRetrieval:
                         ), "{} != {} random_negative.bin 파일을 삭제해 주세요".format(
                             len(load_dataset), len(dataset)
                         )
-                        return load_dataset
+                    return load_dataset
 
-        questions = dataset["question"]
+        questions = [data["question"] for data in dataset]
         p_with_n_contexts = []
         targets = []
 
@@ -369,21 +439,32 @@ class DenseRetrieval:
             len(questions), len(p_with_n_contexts)
         )
 
-        q_seqs = self.tokenizer(
-            questions, padding="max_length", truncation=True, return_tensors="pt"
+        random_question_sample_idx = random.sample(
+            range(len(questions)), min(max_dataset_num, len(questions))
         )
-        p_seqs = self.tokenizer(
-            p_with_n_contexts,
-            padding="max_length",
-            truncation=True,
-            return_tensors="pt",
-        )
+        questions_sample = [questions[i] for i in random_question_sample_idx]
+        targets = [targets[i] for i in random_question_sample_idx]
+        assert len(questions_sample) == len(targets)
+
+        random_p_with_n_sample = [i * p_with_n_num for i in random_question_sample_idx]
+        p_with_n_contexts_sample = []
+        for idx in random_p_with_n_sample:
+            p_with_n_contexts_sample.extend(p_with_n_contexts[idx : idx + p_with_n_num])
+
+        assert (len(questions_sample) * p_with_n_num) == len(p_with_n_contexts_sample)
+
+        print("tokenize questions")
+        q_seqs = self.tokenize_hleper(questions_sample)
+
+        print("tokenize p_with_n_contexts")
+        p_seqs = self.tokenize_hleper(p_with_n_contexts_sample)
 
         max_len = p_seqs["input_ids"].size(-1)
         p_seqs["input_ids"] = p_seqs["input_ids"].view(-1, p_with_n_num, max_len)
         p_seqs["attention_mask"] = p_seqs["attention_mask"].view(
             -1, p_with_n_num, max_len
         )
+
         p_seqs["token_type_ids"] = p_seqs["token_type_ids"].view(
             -1, p_with_n_num, max_len
         )
@@ -480,6 +561,8 @@ class DenseRetrieval:
             optimizer_grouped_parameters, lr=args.learning_rate, eps=args.adam_epsilon
         )
 
+        print("2")
+        GPUtil.showUtilization()
         dataset_list = []
         dataset_list.append(
             self.prepare_negative(
@@ -489,6 +572,8 @@ class DenseRetrieval:
                 pretrain_dense_encoder=is_pretrain,
             )
         )
+        print("data_list size", sys.getsizeof(dataset_list))
+
         if not is_pretrain:
             dataset_list.append(
                 self.prepare_negative(
@@ -497,10 +582,12 @@ class DenseRetrieval:
             )
 
         prepare_train_dataset = torch.utils.data.ConcatDataset(dataset_list)
-        print("prepare_train_dataset", len(prepare_train_dataset))
 
         train_dataloader = DataLoader(
-            prepare_train_dataset, batch_size=batch_size, drop_last=True, shuffle=True
+            prepare_train_dataset,
+            batch_size=batch_size,
+            drop_last=True,
+            shuffle=True,
         )
 
         t_total = len(train_dataloader)
@@ -518,7 +605,11 @@ class DenseRetrieval:
         optimizer.zero_grad()
         torch.cuda.empty_cache()
 
-        args.num_train_epochs = 3
+        if is_pretrain:
+            args.num_train_epochs = 1
+        else:
+            args.num_train_epochs = 3
+
         train_iterator = trange(int(args.num_train_epochs), desc="Epoch")
 
         with torch.set_grad_enabled(True):
@@ -642,7 +733,11 @@ class DenseRetrieval:
             self.q_encoder.eval()
 
             q_seqs_val = self.tokenizer(
-                [query], padding="max_length", truncation=True, return_tensors="pt"
+                [query],
+                padding="max_length",
+                truncation=True,
+                return_tensors="pt",
+                return_token_type_ids=not self.model_args.is_roberta,
             ).to(self.training_args.device)
             q_embs = self.q_encoder(**q_seqs_val).to("cpu")  # (num_query, emb_dim)
 
@@ -671,6 +766,7 @@ class DenseRetrieval:
                 padding="max_length",
                 truncation=True,
                 return_tensors="pt",
+                return_token_type_ids=not self.model_args.is_roberta,
             ).to(self.training_args.device)
             q_embs1 = self.q_encoder(**q).to("cpu").numpy()
 
@@ -679,6 +775,7 @@ class DenseRetrieval:
                 padding="max_length",
                 truncation=True,
                 return_tensors="pt",
+                return_token_type_ids=not self.model_args.is_roberta,
             ).to(self.training_args.device)
             temp_q_embs = self.q_encoder(**temp_q).to("cpu").numpy()
             q_embs = np.stack((q_embs1, temp_q_embs), axis=0).squeeze()
@@ -693,6 +790,7 @@ class DenseRetrieval:
                     padding="max_length",
                     truncation=True,
                     return_tensors="pt",
+                    return_token_type_ids=not self.model_args.is_roberta,
                 ).to(self.training_args.device)
                 temp_q_embs = self.q_encoder(**temp_q).to("cpu").numpy()
                 q_embs = np.concatenate((q_embs, temp_q_embs), axis=0)
@@ -770,7 +868,11 @@ class DenseRetrieval:
             self.q_encoder.eval()
 
             q_seqs_val = self.tokenizer(
-                [query], padding="max_length", truncation=True, return_tensors="pt"
+                [query],
+                padding="max_length",
+                truncation=True,
+                return_tensors="pt",
+                return_token_type_ids=not self.model_args.is_roberta,
             )
             q_embs = self.q_encoder(**q_seqs_val)  # (num_query, emb_dim)
 
@@ -790,7 +892,11 @@ class DenseRetrieval:
             self.q_encoder.eval()
 
             q_seqs_val = self.tokenizer(
-                queries, padding="max_length", truncation=True, return_tensors="pt"
+                queries,
+                padding="max_length",
+                truncation=True,
+                return_tensors="pt",
+                return_token_type_ids=not self.model_args.is_roberta,
             )
             q_embs = self.q_encoder(**q_seqs_val)  # (num_query, emb_dim)
 
