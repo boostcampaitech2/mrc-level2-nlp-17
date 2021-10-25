@@ -1,4 +1,3 @@
-
 import time
 
 from contextlib import contextmanager
@@ -29,6 +28,8 @@ from dateutil.tz import gettz
 
 from retrievers.sparse import SparseRetrieval
 from retrievers.elastic_search import ElasticSearchRetrieval
+from retrievers.DenseRetrieval import DenseRetrieval
+
 
 @contextmanager
 def timer(name):
@@ -36,38 +37,34 @@ def timer(name):
     yield
     print(f"[{name}] done in {time.time() - t0:.3f} s")
 
-def get_retriever(retrieval_model: str,
-                  tokenize_fn: Callable[[str], List[str]],
-                  data_path: str,
-                  context_path: str):
+
+def get_retriever(model_args, data_args, training_args):
 
     retriever_dict = {
         "SparseRetrieval": SparseRetrieval,
         "ElasticSearch": ElasticSearchRetrieval,
+        "DenseRetrieval": DenseRetrieval,
     }
-    return retriever_dict[retrieval_model](tokenize_fn, data_path, context_path)
+    return retriever_dict[model_args.retrieval_model](
+        model_args, data_args, training_args
+    )
 
 
 def run_retrieval(
-    tokenize_fn: Callable[[str], List[str]],
     datasets: DatasetDict,
-    training_args: TrainingArguments,
-    data_args: DataTrainingArguments,
     model_args: ModelArguments,
-    data_path: str = "../data",
-    context_path: str = "wikipedia_documents.json",
+    data_args: DataTrainingArguments,
+    training_args: TrainingArguments,
 ) -> DatasetDict:
 
-    # Query에 맞는 Passage들을 Retrieval 합니다.
-    retriever = get_retriever(
-        retrieval_model=model_args.retrieval_model,
-        tokenize_fn=tokenize_fn,
-        data_path=data_path,
-        context_path=context_path)
+    print("run retrieval datasets : ", datasets)
 
-    print("="*100)
+    # Query에 맞는 Passage들을 Retrieval 합니다.
+    retriever = get_retriever(model_args, data_args, training_args)
+
+    print("=" * 100)
     print(retriever)
-    print("="*100)
+    print("=" * 100)
 
     retriever.get_embedding()
 
@@ -118,22 +115,9 @@ def get_retrieval_accuracy(before_dataset, after_dataset):
 
 def eval_retrieval(model_args, data_args, training_args, datasets):
 
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_args.tokenizer_name
-        if model_args.tokenizer_name
-        else model_args.model_name_or_path,
-        use_fast=True,
-    )
-
     before_dataset = datasets["train"]
 
-    after_dataset = run_retrieval(
-        tokenize_fn=tokenizer.tokenize,
-        datasets=before_dataset,
-        training_args=training_args,
-        data_args=data_args,
-        model_args=model_args
-    )
+    after_dataset = run_retrieval(before_dataset, model_args, data_args, training_args)
     print(
         'dataset : "train", top-k : {}, use_faiss : {}'.format(
             data_args.top_k_retrieval, data_args.use_faiss
@@ -147,13 +131,7 @@ def eval_retrieval(model_args, data_args, training_args, datasets):
 
     before_dataset = datasets["validation"]
 
-    after_dataset = run_retrieval(
-        tokenize_fn=tokenizer.tokenize,
-        datasets=before_dataset,
-        training_args=training_args,
-        data_args=data_args,
-        model_args=model_args
-    )
+    after_dataset = run_retrieval(before_dataset, model_args, data_args, training_args)
     print(
         'dataset : "validation", top-k : {}, use_faiss : {}'.format(
             data_args.top_k_retrieval, data_args.use_faiss
@@ -164,8 +142,8 @@ def eval_retrieval(model_args, data_args, training_args, datasets):
         "retrieval_accuracy :",
         val_accuracy,
     )
-    wandb.log({"Train/accuracy": train_accuracy,
-               "Val/accuracy": val_accuracy})
+    wandb.log({"Train/accuracy": train_accuracy, "Val/accuracy": val_accuracy})
+
 
 if __name__ == "__main__":
 
@@ -178,6 +156,23 @@ if __name__ == "__main__":
 
     org_dataset = load_from_disk(data_args.dataset_name)
 
+    if data_args.pretrain_dense_encoder or data_args.do_train_dense_retrieval:
+
+        denseretrieval = DenseRetrieval(model_args, data_args, training_args)
+
+        training_args.per_device_train_batch_size = 1
+        training_args.evaluation_strategy = "epoch"
+        training_args.learning_rate = 2e-5
+        training_args.weight_decay = 0.01
+
+        print(training_args.per_device_train_batch_size)
+
+        if data_args.pretrain_dense_encoder:
+            denseretrieval.pretrain()
+
+        if data_args.do_train_dense_retrieval:
+            denseretrieval.train(org_dataset["train"])
+
     if training_args.do_eval:
         # wandb
         wandb.init(project="mrc-level2-nlp-retriever")
@@ -185,13 +180,14 @@ if __name__ == "__main__":
         # 파라미터 초기화
         wandb.config.update(model_args)
         wandb.config.update(data_args)
-        #wandb.config.update(training_args)
+        # wandb.config.update(training_args)
 
         # Retriever | 21-10-01 00:00 | Retriever Model Name
         wandb.run.name = (
-            "Retriever | " +
-            datetime.datetime.now(gettz("Asia/Seoul")).strftime("%y-%m-%d %H:%M")
-            + " | " + model_args.retrieval_model
+            "Retriever | "
+            + datetime.datetime.now(gettz("Asia/Seoul")).strftime("%y-%m-%d %H:%M")
+            + " | "
+            + model_args.retrieval_model
         )
         wandb.run.save()
 
@@ -216,7 +212,8 @@ if __name__ == "__main__":
             retrieval_model=model_args.retrieval_model,
             tokenize_fn=tokenizer.tokenize,
             data_path=data_args.data_path,
-            context_path=data_args.context_path)
+            context_path=data_args.context_path,
+        )
 
         retriever.get_embedding()
 
@@ -248,4 +245,3 @@ if __name__ == "__main__":
 
             with timer("single query by exhaustive search"):
                 scores, indices = retriever.retrieve(query)
-

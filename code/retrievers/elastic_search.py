@@ -1,5 +1,6 @@
 import sys
-sys.path.append('../')
+
+sys.path.append("../")
 
 import os
 import json
@@ -29,22 +30,23 @@ from datasets import (
 
 from elasticsearch import Elasticsearch
 
+
 @contextmanager
 def timer(name):
     t0 = time.time()
     yield
     print(f"[{name}] done in {time.time() - t0:.3f} s")
 
-class ElasticSearchRetrieval:
-    def __init__(
-        self,
-        tokenize_fn,
-        data_path: Optional[str] = "../data/",
-        context_path: Optional[str] = "wikipedia_documents.json",
-    ) -> NoReturn:
 
-        self.data_path = data_path
-        with open(os.path.join(data_path, context_path), "r", encoding="utf-8") as f:
+class ElasticSearchRetrieval:
+    def __init__(self, model_args, data_args, training_args) -> NoReturn:
+
+        self.data_path = data_args.data_path
+        with open(
+            os.path.join(data_args.data_path, data_args.context_path),
+            "r",
+            encoding="utf-8",
+        ) as f:
             wiki = json.load(f)
 
         self.contexts = list(
@@ -61,13 +63,11 @@ class ElasticSearchRetrieval:
 
         pprint.pprint(self.es.info())
 
-        self.INDEX_NAME = 'wiki_index'
+        self.INDEX_NAME = "wiki_index"
 
     def get_embedding(self) -> NoReturn:
         # 인덱싱
         pass
-
-
 
     def retrieve(
         self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1
@@ -115,14 +115,14 @@ class ElasticSearchRetrieval:
 
     def get_relevant_doc(self, query: str, k: Optional[int] = 1) -> Tuple[List, List]:
         # 쿼리 검색시 특수문자 앞에 '\' 기호 추가
-        patten = '''[-=+,#/\?:^$.@*\"※~&%ㆍ!』\\‘|\(\)\[\]\<\>`\'…》]'''
+        patten = """[-=+,#/\?:^$.@*\"※~&%ㆍ!』\\‘|\(\)\[\]\<\>`\'…》]"""
         query = re.sub(patten, lambda m: f"\{m.group()}", query)
 
         with timer("searching.."):
             result = self.es.search(index=self.INDEX_NAME, q=query, size=k)
 
-        doc_score = [float(res['_score']) for res in result['hits']['hits'][:k]]
-        doc_indices = [int(res['_id']) for res in result['hits']['hits'][:k]]
+        doc_score = [float(res["_score"]) for res in result["hits"]["hits"][:k]]
+        doc_indices = [int(res["_id"]) for res in result["hits"]["hits"][:k]]
         return doc_score, doc_indices
 
     def get_relevant_doc_bulk(
@@ -133,7 +133,7 @@ class ElasticSearchRetrieval:
 
         for query in queries:
             # 쿼리 검색시 특수문자 앞에 '\' 기호 추가
-            patten = '''[-=+,#/\?:^$.@*\"※~&%ㆍ!』\\‘|\(\)\[\]\<\>`\'…》]'''
+            patten = """[-=+,#/\?:^$.@*\"※~&%ㆍ!』\\‘|\(\)\[\]\<\>`\'…》]"""
             query = re.sub(patten, lambda m: f"\{m.group()}", query)
 
             results.append(self.es.search(index=self.INDEX_NAME, q=query, size=k))
@@ -141,6 +141,8 @@ class ElasticSearchRetrieval:
         doc_scores = []
         doc_indices = []
         for result in results:
-            doc_scores.append([float(res['_score']) for res in result['hits']['hits'][:k]])
-            doc_indices.append([int(res['_id']) for res in result['hits']['hits'][:k]])
+            doc_scores.append(
+                [float(res["_score"]) for res in result["hits"]["hits"][:k]]
+            )
+            doc_indices.append([int(res["_id"]) for res in result["hits"]["hits"][:k]])
         return doc_scores, doc_indices

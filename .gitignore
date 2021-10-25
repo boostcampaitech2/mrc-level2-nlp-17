@@ -1,4 +1,6 @@
 data
+models
+wandb
 .local
 .profile
 .idea
