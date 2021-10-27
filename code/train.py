@@ -328,7 +328,7 @@ def run_mrc(
 
     # wandb
     if training_args.do_eval:
-        wandb.init(project="mrc-level2-nlp")
+        wandb.init(project="mrc-level2-nlp", entity="mrc17_test_korea")
 
         # Reader | 21-10-01 00:00 | Model Name or Path
         wandb.run.name = (
