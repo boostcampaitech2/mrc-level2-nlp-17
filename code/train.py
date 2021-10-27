@@ -326,6 +326,23 @@ def run_mrc(
         compute_metrics=compute_metrics,
     )
 
+    # wandb
+    if training_args.do_eval:
+        wandb.init(project="mrc-level2-nlp", entity="mrc17_test_korea")
+
+        # Reader | 21-10-01 00:00 | Model Name or Path
+        wandb.run.name = (
+                "Reader | "
+                + datetime.datetime.now(gettz("Asia/Seoul")).strftime("%y-%m-%d %H:%M")
+                + " | "
+                + (
+                    model_args.config_name
+                    if model_args.config_name is not None
+                    else model_args.model_name_or_path
+                )
+        )
+        wandb.run.save()
+
     # Training
     if training_args.do_train:
         if last_checkpoint is not None:
@@ -360,21 +377,6 @@ def run_mrc(
 
     # Evaluation
     if training_args.do_eval:
-        # wandb
-        wandb.init(project="mrc-level2-nlp")
-
-        # Reader | 21-10-01 00:00 | Model Name or Path
-        wandb.run.name = (
-            "Reader | "
-            + datetime.datetime.now(gettz("Asia/Seoul")).strftime("%y-%m-%d %H:%M")
-            + " | "
-            + (
-                model_args.config_name
-                if model_args.config_name is not None
-                else model_args.model_name_or_path
-            )
-        )
-        wandb.run.save()
 
         logger.info("*** Evaluate ***")
         metrics = trainer.evaluate()

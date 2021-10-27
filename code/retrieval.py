@@ -177,7 +177,7 @@ if __name__ == "__main__":
 
     if training_args.do_eval:
         # wandb
-        wandb.init(project="mrc-level2-nlp-retriever")
+        wandb.init(project="mrc-level2-nlp-retriever", entity="mrc17_test_korea")
 
         # 파라미터 초기화
         wandb.config.update(model_args)
