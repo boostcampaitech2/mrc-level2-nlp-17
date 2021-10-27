@@ -335,7 +335,6 @@ def run_mrc(
         else:
             checkpoint = None
 
-        print("@@@@@@@@@@@@@@@", checkpoint)
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
         trainer.save_model()  # Saves the tokenizer too for easy upload
 

@@ -31,7 +31,7 @@ class ModelArguments:
     )
 
     retrieval_model: str = field(
-        default="SparseRetrieval",
+        default="ElasticSearch",
         metadata={
             "help": "Using 'SparseRetrieval', 'DenseRetrieval', 'ElasticSearch', 'DenseAndElasticRetrieval' for retieval"
         },
