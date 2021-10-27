@@ -7,7 +7,7 @@ outputs
 .idea
 models
 __pycache__
-.vscode
+.vscode/*
 wandb
 
 # Created by https://www.toptal.com/developers/gitignore/api/python,pycharm+iml
