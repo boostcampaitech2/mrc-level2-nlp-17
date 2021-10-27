@@ -26,6 +26,8 @@ from datasets import (
     DatasetDict,
 )
 
+from transformers import AutoTokenizer
+
 
 @contextmanager
 def timer(name):
@@ -35,12 +37,7 @@ def timer(name):
 
 
 class SparseRetrieval:
-    def __init__(
-        self,
-        tokenize_fn,
-        data_path: Optional[str] = "../data/",
-        context_path: Optional[str] = "wikipedia_documents.json",
-    ) -> NoReturn:
+    def __init__(self, model_args, data_args, training_args) -> NoReturn:
 
         """
         Arguments:
@@ -63,8 +60,12 @@ class SparseRetrieval:
             Passage 파일을 불러오고 TfidfVectorizer를 선언하는 기능을 합니다.
         """
 
-        self.data_path = data_path
-        with open(os.path.join(data_path, context_path), "r", encoding="utf-8") as f:
+        self.data_path = data_args.data_path
+        with open(
+            os.path.join(data_args.data_path, data_args.context_path),
+            "r",
+            encoding="utf-8",
+        ) as f:
             wiki = json.load(f)
 
         self.contexts = list(
@@ -73,9 +74,16 @@ class SparseRetrieval:
         print(f"Lengths of unique contexts : {len(self.contexts)}")
         self.ids = list(range(len(self.contexts)))
 
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            model_args.tokenizer_name
+            if model_args.tokenizer_name
+            else model_args.model_name_or_path,
+            use_fast=True,
+        )
+
         # Transform by vectorizer
         self.tfidfv = TfidfVectorizer(
-            tokenizer=tokenize_fn,
+            tokenizer=self.tokenizer.tokenize,
             ngram_range=(1, 2),
             max_features=50000,
         )

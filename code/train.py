@@ -144,7 +144,7 @@ def run_mrc(
             stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            # return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            return_token_type_ids=not model_args.is_roberta,  # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 
@@ -236,7 +236,7 @@ def run_mrc(
             stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            return_token_type_ids=False,  # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            return_token_type_ids=not model_args.is_roberta,  # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 
@@ -326,6 +326,23 @@ def run_mrc(
         compute_metrics=compute_metrics,
     )
 
+    # wandb
+    if training_args.do_eval:
+        wandb.init(project="mrc-level2-nlp", entity="mrc17_test_korea")
+
+        # Reader | 21-10-01 00:00 | Model Name or Path
+        wandb.run.name = (
+            "Reader | "
+            + datetime.datetime.now(gettz("Asia/Seoul")).strftime("%y-%m-%d %H:%M")
+            + " | "
+            + (
+                model_args.config_name
+                if model_args.config_name is not None
+                else model_args.model_name_or_path
+            )
+        )
+        wandb.run.save()
+
     # Training
     if training_args.do_train:
         if last_checkpoint is not None:
@@ -334,6 +351,7 @@ def run_mrc(
             checkpoint = model_args.model_name_or_path
         else:
             checkpoint = None
+
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
         trainer.save_model()  # Saves the tokenizer too for easy upload
 
@@ -359,21 +377,6 @@ def run_mrc(
 
     # Evaluation
     if training_args.do_eval:
-        # wandb
-        wandb.init(project="mrc-level2-nlp")
-
-        # Reader | 21-10-01 00:00 | Model Name or Path
-        wandb.run.name = (
-            "Reader | "
-            + datetime.datetime.now(gettz("Asia/Seoul")).strftime("%y-%m-%d %H:%M")
-            + " | "
-            + (
-                model_args.config_name
-                if model_args.config_name is not None
-                else model_args.model_name_or_path
-            )
-        )
-        wandb.run.save()
 
         logger.info("*** Evaluate ***")
         metrics = trainer.evaluate()

@@ -39,15 +39,14 @@ def timer(name):
 
 
 class ElasticSearchRetrieval:
-    def __init__(
-        self,
-        tokenize_fn,
-        data_path: Optional[str] = "../data/",
-        context_path: Optional[str] = "wikipedia_documents.json",
-    ) -> NoReturn:
+    def __init__(self, model_args, data_args, training_args) -> NoReturn:
 
-        self.data_path = data_path
-        with open(os.path.join(data_path, context_path), "r", encoding="utf-8") as f:
+        self.data_path = data_args.data_path
+        with open(
+            os.path.join(data_args.data_path, data_args.context_path),
+            "r",
+            encoding="utf-8",
+        ) as f:
             wiki = json.load(f)
 
         self.contexts = list(
