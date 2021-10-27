@@ -5,6 +5,7 @@ data
 models
 __pycache__
 .vscode
+wandb
 
 # Created by https://www.toptal.com/developers/gitignore/api/python,pycharm+iml
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,pycharm+iml

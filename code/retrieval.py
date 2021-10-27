@@ -1,4 +1,3 @@
-
 import time
 
 from contextlib import contextmanager
@@ -30,16 +29,20 @@ from dateutil.tz import gettz
 from retrievers.sparse import SparseRetrieval
 from retrievers.elastic_search import ElasticSearchRetrieval
 
+
 @contextmanager
 def timer(name):
     t0 = time.time()
     yield
     print(f"[{name}] done in {time.time() - t0:.3f} s")
 
-def get_retriever(retrieval_model: str,
-                  tokenize_fn: Callable[[str], List[str]],
-                  data_path: str,
-                  context_path: str):
+
+def get_retriever(
+    retrieval_model: str,
+    tokenize_fn: Callable[[str], List[str]],
+    data_path: str,
+    context_path: str,
+):
 
     retriever_dict = {
         "SparseRetrieval": SparseRetrieval,
@@ -63,11 +66,12 @@ def run_retrieval(
         retrieval_model=model_args.retrieval_model,
         tokenize_fn=tokenize_fn,
         data_path=data_path,
-        context_path=context_path)
+        context_path=context_path,
+    )
 
-    print("="*100)
+    print("=" * 100)
     print(retriever)
-    print("="*100)
+    print("=" * 100)
 
     retriever.get_embedding()
 
@@ -132,7 +136,7 @@ def eval_retrieval(model_args, data_args, training_args, datasets):
         datasets=before_dataset,
         training_args=training_args,
         data_args=data_args,
-        model_args=model_args
+        model_args=model_args,
     )
     print(
         'dataset : "train", top-k : {}, use_faiss : {}'.format(
@@ -152,7 +156,7 @@ def eval_retrieval(model_args, data_args, training_args, datasets):
         datasets=before_dataset,
         training_args=training_args,
         data_args=data_args,
-        model_args=model_args
+        model_args=model_args,
     )
     print(
         'dataset : "validation", top-k : {}, use_faiss : {}'.format(
@@ -164,8 +168,8 @@ def eval_retrieval(model_args, data_args, training_args, datasets):
         "retrieval_accuracy :",
         val_accuracy,
     )
-    wandb.log({"Train/accuracy": train_accuracy,
-               "Val/accuracy": val_accuracy})
+    wandb.log({"Train/accuracy": train_accuracy, "Val/accuracy": val_accuracy})
+
 
 if __name__ == "__main__":
 
@@ -185,13 +189,14 @@ if __name__ == "__main__":
         # 파라미터 초기화
         wandb.config.update(model_args)
         wandb.config.update(data_args)
-        #wandb.config.update(training_args)
+        # wandb.config.update(training_args)
 
         # Retriever | 21-10-01 00:00 | Retriever Model Name
         wandb.run.name = (
-            "Retriever | " +
-            datetime.datetime.now(gettz("Asia/Seoul")).strftime("%y-%m-%d %H:%M")
-            + " | " + model_args.retrieval_model
+            "Retriever | "
+            + datetime.datetime.now(gettz("Asia/Seoul")).strftime("%y-%m-%d %H:%M")
+            + " | "
+            + model_args.retrieval_model
         )
         wandb.run.save()
 
@@ -216,7 +221,8 @@ if __name__ == "__main__":
             retrieval_model=model_args.retrieval_model,
             tokenize_fn=tokenizer.tokenize,
             data_path=data_args.data_path,
-            context_path=data_args.context_path)
+            context_path=data_args.context_path,
+        )
 
         retriever.get_embedding()
 
@@ -248,4 +254,3 @@ if __name__ == "__main__":
 
             with timer("single query by exhaustive search"):
                 scores, indices = retriever.retrieve(query)
-
