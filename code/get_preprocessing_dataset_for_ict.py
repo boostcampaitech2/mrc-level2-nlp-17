@@ -8,6 +8,8 @@ import pandas as pd
 import re
 import random
 from pprint import pprint
+
+import torch
 import kss
 
 from transformers import (
@@ -31,27 +33,65 @@ def preprocessing_for_ict(data_args, wiki):
         {
             "context": Value(dtype="string", id=None),
             "question": Value(dtype="string", id=None),
+            "context_id": Value(dtype="int64", id=None),
         }
     )
     wiki_path = os.path.join(data_args.data_path, "preprocessing_for_ict.bin")
+    checkpoint_wiki_path = os.path.join(
+        data_args.data_path, "checkpoint_preprocessing_for_ict.bin"
+    )
+
+    last_check_id = 0
+    check_step = 3000
+    check_time = 1
+    checkpoint_dataset = None
+    if os.path.isfile(checkpoint_wiki_path):
+        with open(checkpoint_wiki_path, "rb") as file:
+            checkpoint_dataset = pickle.load(file)
+            last_check_id = checkpoint_dataset[-1]["context_id"] + 1
+            print("last_check : ", checkpoint_dataset[-1]["context_id"])
+            print("next id :", wiki[last_check_id]["id"])
+
+    wiki = [wiki[i] for i in range(last_check_id, len(wiki))]
 
     total = []
-
+    i = 0
     for data in tqdm(wiki):
         context = data["context"]
-        context = context.replace("　", " ")
-
+        id = data["id"]
         if not context:
             continue
+        try:
+            splited_sent = kss.split_sentences(context)
+        except IndexError:
+            continue
+        else:
+            for sent in splited_sent:
+                tmp = {"question": sent, "context": context, "context_id": id}
+                total.append(tmp)
+        if i == (check_step * check_time):
+            check_time += 1
+            assert total
+            dataset_dataframe = pd.DataFrame(total)
+            dataset_dataframe.drop_duplicates(
+                subset=["question", "context", "context_id"], inplace=True
+            )
+            dataset = Dataset.from_pandas(dataset_dataframe, features=f)
 
-        splited_sent = kss.split_sentences(context)
-        for sent in splited_sent:
-            tmp = {"question": sent, "context": context}
-            total.append(tmp)
+            if checkpoint_dataset:
+                dataset = torch.utils.data.ConcatDataset([checkpoint_dataset, dataset])
+
+            print("write", checkpoint_wiki_path)
+            with open(checkpoint_wiki_path, "wb") as file:
+                pickle.dump(dataset, file)
+        i += 1
     assert total
     dataset_dataframe = pd.DataFrame(total)
     dataset_dataframe.drop_duplicates(subset=["question", "context"], inplace=True)
     dataset = Dataset.from_pandas(dataset_dataframe, features=f)
+
+    if checkpoint_dataset:
+        dataset = torch.utils.data.ConcatDataset([checkpoint_dataset, dataset])
 
     print("write", wiki_path)
     with open(wiki_path, "wb") as file:
@@ -77,9 +117,15 @@ if __name__ == "__main__":
 
     context_list = []
     for w in wiki.values():
-        context_list.append(w["text"])
-    temp = {"context": context_list}
+        context_list.append((w["text"], w["document_id"]))
+
+    context_list = sorted(context_list, key=lambda x: x[1])
+    contexts, ids = zip(*context_list)
+
+    temp = {"context": contexts, "id": ids}
     wiki = Dataset.from_dict(temp)
+
+    print(wiki)
 
     preprocessing_for_ict(data_args, wiki)
 

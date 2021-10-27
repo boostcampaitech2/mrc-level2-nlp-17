@@ -11,9 +11,12 @@ class ModelArguments:
     model_name_or_path: str = field(
         default="klue/bert-base",
         metadata={
-            "help": "Path to pretrained model or model identifier from huggingface.co/models"
+            "help": "Path to pretrained model or model identifier from huggingface.co/models  klue/roberta-large klue/bert-base"
         },
     )
+
+    is_roberta: bool = field(default=False, metadata={"help": "use Reberta model"})
+
     config_name: Optional[str] = field(
         default=None,
         metadata={
@@ -28,9 +31,9 @@ class ModelArguments:
     )
 
     retrieval_model: str = field(
-        default="DenseRetrieval",
+        default="ElasticSearch",
         metadata={
-            "help": "Using 'SparseRetrieval', 'DenseRetrieval', 'ElasticSearch' for retieval"
+            "help": "Using 'SparseRetrieval', 'DenseRetrieval', 'ElasticSearch', 'DenseAndElasticRetrieval' for retieval"
         },
     )
 
@@ -127,4 +130,8 @@ class DataTrainingArguments:
         metadata={
             "help": "When Train Dense retrieval, input positive and negative passage num per one question"
         },
+    )
+    pretrain_max_dataset_num: int = field(
+        default=10000,
+        metadata={"help": "Dense Retrieval를 pretrain할 때 사용할 ict dataset의 question의 갯수"},
     )
