@@ -29,6 +29,7 @@ from dateutil.tz import gettz
 from retrievers.sparse import SparseRetrieval
 from retrievers.elastic_search import ElasticSearchRetrieval
 from retrievers.DenseRetrieval import DenseRetrieval
+from retrievers.DenseAndElasticRetrieval import DenseAndElasticRetrieval
 
 
 @contextmanager
@@ -44,6 +45,7 @@ def get_retriever(model_args, data_args, training_args):
         "SparseRetrieval": SparseRetrieval,
         "ElasticSearch": ElasticSearchRetrieval,
         "DenseRetrieval": DenseRetrieval,
+        "DenseAndElasticRetrieval": DenseAndElasticRetrieval,
     }
     return retriever_dict[model_args.retrieval_model](
         model_args, data_args, training_args
