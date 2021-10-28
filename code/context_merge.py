@@ -20,6 +20,8 @@ import pandas as pd
 
 from tqdm import tqdm
 
+import copy
+
 
 class HiddenPrints:
     def __enter__(self):
@@ -38,9 +40,12 @@ def top_k_context_merger(retrieval, dataset, top_k):
         with HiddenPrints():
             _, negative_context_list = retrieval.retrieve(data["question"], top_k + 1)
         positive_context = data["context"]
+        negative_context_list = [negative_context for negative_context in negative_context_list if not negative_context in positive_context]
+        negative_context_list = negative_context_list[:top_k]
+        
         answer_start = data["answers"]["answer_start"][0]
         for i in range(top_k + 1):
-            context_list = negative_context_list
+            context_list = copy.deepcopy(negative_context_list)
             context_list.insert(i, positive_context)
 
             start = answer_start
@@ -57,7 +62,8 @@ def top_k_context_merger(retrieval, dataset, top_k):
                 "__index_level_0__": -1,
                 "document_id": -1,
             }
-        total.append(tmp)
+            total.append(tmp)
+    
 
     df = pd.DataFrame(total)
     return Dataset.from_pandas(df, features=f)
