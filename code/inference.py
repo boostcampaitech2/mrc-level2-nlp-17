@@ -31,7 +31,12 @@ from transformers import (
     set_seed,
 )
 
-from utils_qa import postprocess_qa_predictions, check_no_error
+from utils_qa import (
+    postprocess_qa_predictions,
+    check_no_error,
+    remove_ending_pos_starting_with_j,
+    remove_other_characters,
+)
 from trainer_qa import QuestionAnsweringTrainer
 
 from arguments import (
@@ -42,6 +47,8 @@ from arguments import (
 from retrieval import (
     get_retriever,
 )
+
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +201,10 @@ def run_mrc(
     def prepare_validation_features(examples):
         # truncation과 padding(length가 짧을때만)을 통해 toknization을 진행하며, stride를 이용하여 overflow를 유지합니다.
         # 각 example들은 이전의 context와 조금씩 겹치게됩니다.
+
+        if data_args.do_preprocessing:
+            examples = remove_other_characters(examples)
+
         tokenized_examples = tokenizer(
             examples[question_column_name if pad_on_right else context_column_name],
             examples[context_column_name if pad_on_right else question_column_name],
@@ -202,7 +213,7 @@ def run_mrc(
             stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            return_token_type_ids=False,  # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            return_token_type_ids=not model_args.is_roberta,  # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 
@@ -263,8 +274,12 @@ def run_mrc(
             output_dir=training_args.output_dir,
         )
         # Metric을 구할 수 있도록 Format을 맞춰줍니다.
+        # do_postprocessing argument를 True로 설정할 경우 prediction_text의 끝 토큰이 J로 시작하는 각종 조사일 경우 이를 제거하는 후처리를 수행합니다.
         formatted_predictions = [
-            {"id": k, "prediction_text": v} for k, v in predictions.items()
+            {"id": k, "prediction_text": remove_ending_pos_starting_with_j(v)}
+            if data_args.do_postprocessing
+            else {"id": k, "prediction_text": v}
+            for k, v in predictions.items()
         ]
 
         if training_args.do_predict:
