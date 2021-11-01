@@ -32,25 +32,8 @@ class HiddenPrints:
 
 
 def top_k_context_merger(retrieval, dataset, top_k):
-    f = Features(
-        {
-            "title": Value(dtype="string", id=None),
-            "answers": Sequence(
-                feature={
-                    "text": Value(dtype="string", id=None),
-                    "answer_start": Value(dtype="int32", id=None),
-                },
-                length=-1,
-                id=None,
-            ),
-            "context": Value(dtype="string", id=None),
-            "id": Value(dtype="string", id=None),
-            "question": Value(dtype="string", id=None),
-        }
-    )
-
+    f = dataset.features
     total = []
-    answers = []
     for data in tqdm(dataset):
         with HiddenPrints():
             _, negative_context_list = retrieval.retrieve(data["question"], top_k + 1)
@@ -66,16 +49,17 @@ def top_k_context_merger(retrieval, dataset, top_k):
             data["answers"]["answer_start"][0] = start
 
             tmp = {
-                "question": data["question"],
-                "id": data["id"] + "-merge-{}".format(i),
-                "context": "".join(context_list),
-                "answers": data["answers"],
                 "title": data["title"],
+                "answers": data["answers"],
+                "context": "".join(context_list),
+                "id": data["id"] + "-merge-{}".format(i),
+                "question": data["question"],
+                "__index_level_0__": -1,
+                "document_id": -1,
             }
-            total.append(tmp)
-    print(total[0])
+        total.append(tmp)
+
     df = pd.DataFrame(total)
-    print(df.iloc[0])
     return Dataset.from_pandas(df, features=f)
 
 
@@ -89,20 +73,28 @@ if __name__ == "__main__":
 
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
+    merged_path = os.path.join(data_args.dataset_name, "merged_context")
+
     datasets = load_from_disk(data_args.dataset_name)
 
     train_dataset = datasets["train"]
 
+    # ValueError: Datasets should ALL come from memory, or should ALL come from disk. 오류 해결
+    total = []
+    for data in train_dataset:
+        tmp = {key: data[key] for key in data.keys()}
+        total.append(tmp)
+    df = pd.DataFrame(total)
+    train_dataset = Dataset.from_pandas(df, features=train_dataset.features)
+
     retrieval = retrieval.get_retriever(model_args, data_args, training_args)
 
-    dataset_list = [
-        train_dataset,
-        top_k_context_merger(retrieval, train_dataset, 1),
-        # top_k_context_merger(retrieval, train_dataset, 2),
-        # top_k_context_merger(retrieval, train_dataset, 3),
-    ]
+    dataset_list = [train_dataset]
+
+    for k in range(1, data_args.merge_context_num + 1):
+        dataset_list.append(top_k_context_merger(retrieval, train_dataset, k))
 
     merged_dataset = concatenate_datasets(dataset_list)
 
-    merged_path = os.path.join(data_args.dataset_name, "merged_context")
-    # merged_dataset.save_to_disk(merged_path)
+    datasets["train"] = merged_dataset
+    datasets.save_to_disk(merged_path)

@@ -9,13 +9,13 @@ class ModelArguments:
     """
 
     model_name_or_path: str = field(
-        default="klue/bert-base",
+        default="klue/roberta-large",
         metadata={
             "help": "Path to pretrained model or model identifier from huggingface.co/models  klue/roberta-large klue/bert-base"
         },
     )
 
-    is_roberta: bool = field(default=False, metadata={"help": "use Reberta model"})
+    is_roberta: bool = field(default=True, metadata={"help": "use Reberta model"})
 
     config_name: Optional[str] = field(
         default=None,
@@ -136,6 +136,11 @@ class DataTrainingArguments:
         metadata={"help": "Dense Retrieval를 pretrain할 때 사용할 ict dataset의 question의 갯수"},
     )
 
+    merge_context_num: int = field(
+        default=3,
+        metadata={"help": "top-1 부터 top-num까지 context merge한 결과를 누적하여 데이터셋으로 저장"},
+    )
+
     do_preprocessing: bool = field(
         default=False,
         metadata={"help": "Whether to remove other characters in preprocessing"},
@@ -143,5 +148,7 @@ class DataTrainingArguments:
 
     do_postprocessing: bool = field(
         default=False,
-        metadata={"help": "Whether to remove ending pos starting with J in postprocessing"},
+        metadata={
+            "help": "Whether to remove ending pos starting with J in postprocessing"
+        },
     )
