@@ -36,6 +36,10 @@ from arguments import (
     DataTrainingArguments,
 )
 
+import re
+from konlpy.tag import Mecab
+
+mecab = Mecab()
 
 logger = logging.getLogger(__name__)
 
@@ -360,3 +364,38 @@ def check_no_error(
     if "validation" not in datasets:
         raise ValueError("--do_eval requires a validation dataset")
     return last_checkpoint, max_seq_length
+
+
+# 전처리시 한글, 영어, 숫자, 한자, 일본어, 기타 특수 문자를 제외한 나머지 문자들을 제거합니다.
+def remove_other_characters(examples, context_column_name, pad_on_right):
+    contexts = examples[context_column_name if pad_on_right else context_column_name]
+    modified_contexts = []
+    # 아래는 허용하는 문자들, 이들을 제외한 나머지는 모두 제거합니다.
+    p = re.compile(
+        r"[^\sㄱ-ㅎㅏ-ㅣ가-힣0-9a-zA-Zぁ-ヾ㑀-龜!\"%'()+,-./:<>~\xad°·äć‘’“”∧≪≫〈〉《》「」『』・＜＞]"
+    )
+
+    for context in contexts:
+        modified_context = re.sub(r"text=", " ", context)
+        modified_context = re.sub(r"\n", " ", context)
+        modified_context = re.sub(r"\\n", " ", context)
+        modified_context = re.sub(p, " ", modified_context)
+        modified_context = re.sub(r"\s+", " ", modified_context)
+        modified_contexts.append(modified_context)
+
+    examples[
+        context_column_name if pad_on_right else context_column_name
+    ] = modified_contexts
+
+    return examples
+
+
+# 후처리시 끝 토큰이 J로 시작하는 각종 조사들이라면, 제거합니다.
+def remove_ending_pos_starting_with_j(text):
+    pos_tagging = mecab.pos(text)
+    if pos_tagging != []:
+        ending_pos = pos_tagging[-1]
+        if "J" in ending_pos[1]:
+            text = text[: -len(ending_pos[0])]
+
+    return text
