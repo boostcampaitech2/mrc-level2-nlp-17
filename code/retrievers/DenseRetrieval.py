@@ -340,7 +340,7 @@ class DenseRetrieval:
     ):
         print("start prepare_negative")
 
-        # 너무 데이터가 많은 경우 시간이 오르걸리므로 max_dataset_num으로 제한
+        # 너무 데이터가 많은 경우 시간이 오래걸리므로 max_dataset_num으로 제한
         max_dataset_num = self.data_args.pretrain_max_dataset_num
 
         if pretrain_dense_encoder and use_tfidf_top_k_negativ:
