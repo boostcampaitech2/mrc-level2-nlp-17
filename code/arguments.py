@@ -135,3 +135,13 @@ class DataTrainingArguments:
         default=10000,
         metadata={"help": "Dense Retrieval를 pretrain할 때 사용할 ict dataset의 question의 갯수"},
     )
+
+    do_preprocessing: bool = field(
+        default=False,
+        metadata={"help": "Whether to remove other characters in preprocessing"},
+    )
+
+    do_postprocessing: bool = field(
+        default=False,
+        metadata={"help": "Whether to remove ending pos starting with J in postprocessing"},
+    )
