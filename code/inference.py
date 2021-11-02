@@ -47,8 +47,6 @@ from retrieval import (
     get_retriever,
 )
 
-import re
-
 logger = logging.getLogger(__name__)
 
 
