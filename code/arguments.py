@@ -141,11 +141,6 @@ class DataTrainingArguments:
         metadata={"help": "top-1 부터 top-num까지 context merge한 결과를 누적하여 데이터셋으로 저장"},
     )
 
-    do_preprocessing: bool = field(
-        default=False,
-        metadata={"help": "Whether to remove other characters in preprocessing"},
-    )
-
     do_postprocessing: bool = field(
         default=False,
         metadata={

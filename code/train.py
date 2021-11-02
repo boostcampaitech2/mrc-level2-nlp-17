@@ -22,7 +22,6 @@ from tokenizers.models import WordPiece
 from utils_qa import (
     postprocess_qa_predictions,
     check_no_error,
-    remove_other_characters,
     remove_ending_pos_starting_with_j,
 )
 from trainer_qa import QuestionAnsweringTrainer
@@ -142,12 +141,6 @@ def run_mrc(
         # truncation과 padding(length가 짧을때만)을 통해 toknization을 진행하며, stride를 이용하여 overflow를 유지합니다.
         # 각 example들은 이전의 context와 조금씩 겹치게됩니다.
 
-        # do_preprocessing argument를 True로 설정할 경우 answer에 나타나지 않는 각종 문자들을 context로부터 제거하는 전처리를 수행합니다.
-        if data_args.do_preprocessing:
-            examples = remove_other_characters(
-                examples, context_column_name, pad_on_right
-            )
-
         tokenized_examples = tokenizer(
             examples[question_column_name if pad_on_right else context_column_name],
             examples[context_column_name if pad_on_right else question_column_name],
@@ -240,12 +233,6 @@ def run_mrc(
     def prepare_validation_features(examples):
         # truncation과 padding(length가 짧을때만)을 통해 toknization을 진행하며, stride를 이용하여 overflow를 유지합니다.
         # 각 example들은 이전의 context와 조금씩 겹치게됩니다.
-
-        # do_preprocessing argument를 True로 설정할 경우 answer에 나타나지 않는 각종 문자들을 context로부터 제거하는 전처리를 수행합니다.
-        if data_args.do_preprocessing:
-            examples = remove_other_characters(
-                examples, context_column_name, pad_on_right
-            )
 
         tokenized_examples = tokenizer(
             examples[question_column_name if pad_on_right else context_column_name],
