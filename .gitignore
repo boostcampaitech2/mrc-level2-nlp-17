@@ -1,4 +1,5 @@
 data
+preprocessed_data
 models
 wandb
 outputs
