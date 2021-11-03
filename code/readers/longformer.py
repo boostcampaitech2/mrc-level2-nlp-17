@@ -1,15 +1,12 @@
 import logging
 import math
 import copy
-from builtins import NameError
 
 from torch import nn
-from torch.nn import functional as F
+from torch.nn import functional as f
 
 import torch
-from dataclasses import dataclass, field
-from transformers import RobertaForMaskedLM, RobertaTokenizerFast, TextDataset, DataCollatorForLanguageModeling, Trainer
-from transformers import TrainingArguments, HfArgumentParser
+
 from transformers import (
     LongformerSelfAttention,
     AutoModelForQuestionAnswering,
@@ -54,8 +51,6 @@ class RobertaLongSelfAttention(LongformerSelfAttention):
         key_vectors = self.key(hidden_states)
         value_vectors = self.value(hidden_states)
 
-        ## Lines below has been changed
-
         attention_mask = attention_mask.squeeze(dim=2).squeeze(dim=1)
 
         # is index masked or global attention
@@ -63,8 +58,7 @@ class RobertaLongSelfAttention(LongformerSelfAttention):
         is_index_global_attn = attention_mask > 0
         is_global_attn = any(is_index_global_attn.flatten())
 
-        ## End of modification
-
+        # End of modification
         seq_len, batch_size, embed_dim = hidden_states.size()
         assert (
                 embed_dim == self.embed_dim
@@ -81,12 +75,7 @@ class RobertaLongSelfAttention(LongformerSelfAttention):
         )
 
         # values to pad for attention probs
-
-        ## Lines below has been changed
-
         remove_from_windowed_attention_mask = (attention_mask != 0).unsqueeze(dim=-1).unsqueeze(dim=-1)
-
-        ## End of modification
 
         # cast to fp32/fp16 then replace 1's with -inf
         float_mask = remove_from_windowed_attention_mask.type_as(query_vectors).masked_fill(
@@ -133,7 +122,7 @@ class RobertaLongSelfAttention(LongformerSelfAttention):
             # free memory
             del global_key_attn_scores
 
-        attn_probs = F.softmax(attn_scores, dim=-1, dtype=torch.float32)  # use fp32 for numerical stability
+        attn_probs = f.softmax(attn_scores, dim=-1, dtype=torch.float32)  # use fp32 for numerical stability
 
         # softmax sometimes inserts NaN if all positions are masked, replace them with 0
         attn_probs = torch.masked_fill(attn_probs, is_index_masked[:, :, None, None], 0.0)
@@ -143,7 +132,7 @@ class RobertaLongSelfAttention(LongformerSelfAttention):
         del attn_scores
 
         # apply dropout
-        attn_probs = F.dropout(attn_probs, p=self.dropout, training=self.training)
+        attn_probs = f.dropout(attn_probs, p=self.dropout, training=self.training)
 
         value_vectors = value_vectors.view(seq_len, batch_size, self.num_heads, self.head_dim).transpose(0, 1)
 
@@ -232,7 +221,7 @@ def create_long_model(
         model: AutoModelForQuestionAnswering,
         tokenizer: AutoTokenizer,
         config: AutoConfig,
-        max_pos : int,
+        max_pos: int,
         attention_window: int):
 
     # extend position embeddings
@@ -252,7 +241,7 @@ def create_long_model(
         new_pos_embed[k:(k + step)] = model.roberta.embeddings.position_embeddings.weight[2:]
         k += step
     model.roberta.embeddings.position_embeddings.weight.data = new_pos_embed
-    model.roberta.embeddings.position_ids.data = torch.tensor([i for i in range(max_pos)]).reshape(1, max_pos) # v4.0.0+
+    model.roberta.embeddings.position_ids.data = torch.tensor([i for i in range(max_pos)]).reshape(1, max_pos)
 
     # replace the `modeling_bert.BertSelfAttention` object with `LongformerSelfAttention`
     model.config.attention_window = [attention_window] * model.config.num_hidden_layers
@@ -273,6 +262,7 @@ def create_long_model(
     # tokenizer.save_pretrained(save_model_to)
 
     return model, tokenizer
+
 
 def copy_proj_layers(model):
     for i, layer in enumerate(model.roberta.encoder.layer):
