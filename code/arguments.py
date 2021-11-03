@@ -140,3 +140,10 @@ class DataTrainingArguments:
         default=3,
         metadata={"help": "top-1 부터 top-num까지 context merge한 결과를 누적하여 데이터셋으로 저장"},
     )
+
+    do_postprocessing: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to remove ending pos starting with J in postprocessing"
+        },
+    )
