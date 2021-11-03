@@ -93,14 +93,14 @@ def main():
         config=config,
     )
     
-    if model_args.convert_to_long:
+    if model_args.convert_to_longformer:
         if "./" not in model_args.model_name_or_path:
             print(f"Pretrained Model to Longformer")
             model, tokenizer = create_long_model(
                 model,
                 tokenizer,
                 config,
-                model_args.max_pos,
+                model_args.model_max_length,
                 model_args.attention_window
             )
 
