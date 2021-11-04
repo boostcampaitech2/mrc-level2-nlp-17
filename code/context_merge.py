@@ -46,6 +46,7 @@ def top_k_context_merger(retrieval, dataset, top_k):
         answer_start = data["answers"]["answer_start"][0]
         for i in range(top_k + 1):
             context_list = copy.deepcopy(negative_context_list)
+            data = copy.deepcopy(data)
             context_list.insert(i, positive_context)
 
             start = answer_start

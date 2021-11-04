@@ -113,7 +113,8 @@ def postprocess_qa_predictions(
     example_id_to_index = {k: i for i, k in enumerate(examples["id"])}
     features_per_example = collections.defaultdict(list)
     for i, feature in enumerate(features):
-        features_per_example[example_id_to_index[feature["example_id"]]].append(i)
+        features_per_example[example_id_to_index[feature["example_id"]]].append(
+            i)
 
     # prediction, nbest에 해당하는 OrderedDict 생성합니다.
     all_predictions = collections.OrderedDict()
@@ -162,10 +163,11 @@ def postprocess_qa_predictions(
 
             # `n_best_size`보다 큰 start and end logits을 살펴봅니다.
             start_indexes = np.argsort(start_logits)[
-                -1 : -n_best_size - 1 : -1
+                -1: -n_best_size - 1: -1
             ].tolist()
 
-            end_indexes = np.argsort(end_logits)[-1 : -n_best_size - 1 : -1].tolist()
+            end_indexes = np.argsort(
+                end_logits)[-1: -n_best_size - 1: -1].tolist()
 
             for start_index in start_indexes:
                 for end_index in end_indexes:
@@ -221,7 +223,8 @@ def postprocess_qa_predictions(
         context = example["context"]
         for pred in predictions:
             offsets = pred.pop("offsets")
-            pred["text"] = context[offsets[0] : offsets[1]]
+            pred["text"] = context[offsets[0]: offsets[1]]
+            pred["offsets"] = offsets
 
         # rare edge case에는 null이 아닌 예측이 하나도 없으며 failure를 피하기 위해 fake prediction을 만듭니다.
         if len(predictions) == 0 or (
@@ -229,7 +232,8 @@ def postprocess_qa_predictions(
         ):
 
             predictions.insert(
-                0, {"text": "empty", "start_logit": 0.0, "end_logit": 0.0, "score": 0.0}
+                0, {"text": "empty", "start_logit": 0.0,
+                    "end_logit": 0.0, "score": 0.0}
             )
 
         # 모든 점수의 소프트맥스를 계산합니다(we do it with numpy to stay independent from torch/tf in this file, using the LogSumExp trick).
@@ -257,7 +261,8 @@ def postprocess_qa_predictions(
                 - best_non_null_pred["start_logit"]
                 - best_non_null_pred["end_logit"]
             )
-            scores_diff_json[example["id"]] = float(score_diff)  # JSON-serializable 가능
+            scores_diff_json[example["id"]] = float(
+                score_diff)  # JSON-serializable 가능
             if score_diff > null_score_diff_threshold:
                 all_predictions[example["id"]] = ""
             else:
@@ -299,7 +304,8 @@ def postprocess_qa_predictions(
         logger.info(f"Saving predictions to {prediction_file}.")
         with open(prediction_file, "w", encoding="utf-8") as writer:
             writer.write(
-                json.dumps(all_predictions, indent=4, ensure_ascii=False) + "\n"
+                json.dumps(all_predictions, indent=4,
+                           ensure_ascii=False) + "\n"
             )
         logger.info(f"Saving nbest_preds to {nbest_file}.")
         with open(nbest_file, "w", encoding="utf-8") as writer:
@@ -310,7 +316,8 @@ def postprocess_qa_predictions(
             logger.info(f"Saving null_odds to {null_odds_file}.")
             with open(null_odds_file, "w", encoding="utf-8") as writer:
                 writer.write(
-                    json.dumps(scores_diff_json, indent=4, ensure_ascii=False) + "\n"
+                    json.dumps(scores_diff_json, indent=4,
+                               ensure_ascii=False) + "\n"
                 )
 
     return all_predictions

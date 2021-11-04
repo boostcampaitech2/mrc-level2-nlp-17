@@ -15,7 +15,8 @@ class ModelArguments:
         },
     )
 
-    is_roberta: bool = field(default=False, metadata={"help": "use Reberta model"})
+    is_roberta: bool = field(default=False, metadata={
+                             "help": "use Reberta model"})
 
     config_name: Optional[str] = field(
         default=None,
@@ -96,7 +97,8 @@ class DataTrainingArguments:
     )
     eval_retrieval: bool = field(
         default=True,
-        metadata={"help": "Whether to run passage retrieval using sparse embedding."},
+        metadata={
+            "help": "Whether to run passage retrieval using sparse embedding."},
     )
     num_clusters: int = field(
         default=64, metadata={"help": "Define how many clusters to use for faiss."}
@@ -133,10 +135,16 @@ class DataTrainingArguments:
     )
     pretrain_max_dataset_num: int = field(
         default=10000,
-        metadata={"help": "Dense Retrieval를 pretrain할 때 사용할 ict dataset의 question의 갯수"},
+        metadata={
+            "help": "Dense Retrieval를 pretrain할 때 사용할 ict dataset의 question의 갯수"},
     )
 
     merge_context_num: int = field(
         default=1,
         metadata={"help": "top-1 부터 top-num까지 context merge한 결과를 누적하여 데이터셋으로 저장"},
+    )
+
+    prefix: str = field(
+        default="",
+        metadata={"help": "save predictions prefix"},
     )
