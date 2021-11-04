@@ -53,6 +53,9 @@ def main():
     # training_args.per_device_train_batch_size = 4
     # print(training_args.per_device_train_batch_size)
 
+    # wandb sweep 사용시 checkpoint 저장을 비활성화해서 용량이 부족하지 않게 합니다.
+    training_args.save_steps = 100000
+
     print(f"model is from {model_args.model_name_or_path}")
     print(f"data is from {data_args.dataset_name}")
 
