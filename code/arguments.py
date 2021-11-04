@@ -14,8 +14,7 @@ class ModelArguments:
             "help": "Path to pretrained model or model identifier from huggingface.co/models  klue/roberta-large klue/bert-base"
         },
     )
-
-    is_roberta: bool = field(default=True, metadata={"help": "use Reberta model"})
+    is_roberta: bool = field(default=True, metadata={"help": "use Roberta model"})
 
     config_name: Optional[str] = field(
         default=None,
@@ -29,7 +28,6 @@ class ModelArguments:
             "help": "Pretrained tokenizer name or path if not the same as model_name"
         },
     )
-
     retrieval_model: str = field(
         default="ElasticSearch",
         metadata={
@@ -48,12 +46,10 @@ class DataTrainingArguments:
         default="../data",
         metadata={"help": "data path"},
     )
-
     context_path: Optional[str] = field(
         default="wikipedia_documents.json",
         metadata={"help": "data path"},
     )
-
     dataset_name: Optional[str] = field(
         default="../data/train_dataset",
         metadata={"help": "The name of the dataset to use."},
@@ -116,15 +112,12 @@ class DataTrainingArguments:
     pretrain_dense_encoder: bool = field(
         default=False, metadata={"help": "whether to pretrain dense encoder"}
     )
-
     do_train_dense_retrieval: bool = field(
         default=False, metadata={"help": "To Train Dense retrieval"}
     )
-
     use_pretrained_dense_encoder: bool = field(
         default=False, metadata={"help": "use pretrained dense encoder"}
     )
-
     p_with_n_num: int = field(
         default=20,
         metadata={
@@ -135,14 +128,12 @@ class DataTrainingArguments:
         default=10000,
         metadata={"help": "Dense Retrieval를 pretrain할 때 사용할 ict dataset의 question의 갯수"},
     )
-
     merge_context_num: int = field(
         default=3,
         metadata={"help": "top-1 부터 top-num까지 context merge한 결과를 누적하여 데이터셋으로 저장"},
     )
-
     do_postprocessing: bool = field(
-        default=False,
+        default=True,
         metadata={
             "help": "Whether to remove ending pos starting with J in postprocessing"
         },
