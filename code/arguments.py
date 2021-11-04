@@ -36,6 +36,31 @@ class ModelArguments:
             "help": "Using 'SparseRetrieval', 'DenseRetrieval', 'ElasticSearch', 'DenseAndElasticRetrieval' for retieval"
         },
     )
+    
+    # setting for Longformer
+
+    convert_to_longformer: bool = field(
+        default=False, # if True, make model to Longformer
+        metadata={
+            "help": "convert pretrained model to Longformer model."
+            "only use for roberta"
+            "needs : --max_seq_length 4096 --pad_to_max_length True"
+        },
+    )
+
+    model_max_length: Optional[int] = field(
+        default=4096,  # extend the position embeddings from 512 positions to max_pos. In Longformer, we set max_pos=4096
+        metadata={
+            "help": "set Maximum position for Longformer"
+       },
+    )
+    
+    attention_window: Optional[int] = field(
+        default=512,
+        metadata={
+            "help": "Size of attention window in longformer"
+        }
+    )
 
 
 @dataclass

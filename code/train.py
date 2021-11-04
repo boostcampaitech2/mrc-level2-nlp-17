@@ -36,6 +36,9 @@ import wandb
 import datetime
 from dateutil.tz import gettz
 
+from readers.longformer import create_long_model, copy_proj_layers
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -93,6 +96,16 @@ def main():
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
         config=config,
     )
+    
+    if model_args.convert_to_longformer:
+        print(f"Pretrained Model to Longformer")
+        model, tokenizer = create_long_model(
+            model,
+            tokenizer,
+            config,
+            model_args.model_max_length,
+            model_args.attention_window
+        )
 
     print(
         type(training_args),
