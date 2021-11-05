@@ -21,7 +21,7 @@ bash ./install/install_requirements.sh
 
 ### 저장소 구조
 
-![tree](./code/assets/tree.png)
+<img width="368" alt="Tree" src="https://user-images.githubusercontent.com/68656752/140494514-05c7875f-f1fa-4fde-a508-cfad0ad254cc.png">
 
 ## 데이터 소개
 
