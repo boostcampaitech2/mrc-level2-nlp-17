@@ -21,24 +21,13 @@ bash ./install/install_requirements.sh
 
 ### 저장소 구조
 
-```bash
-./assets/                # readme 에 필요한 이미지 저장
-./install/               # 요구사항 설치 파일 
-./data/                  # 전체 데이터. 아래 상세 설명
-retrieval.py             # sparse retreiver 모듈 제공 
-arguments.py             # 실행되는 모든 argument가 dataclass 의 형태로 저장되어있음
-trainer_qa.py            # MRC 모델 학습에 필요한 trainer 제공.
-utils_qa.py              # 기타 유틸 함수 제공 
-
-train.py                 # MRC, Retrieval 모델 학습 및 평가 
-inference.py		     # ODQA 모델 평가 또는 제출 파일 (predictions.json) 생성
-```
+![tree](./code/assets/tree.png)
 
 ## 데이터 소개
 
 아래는 제공하는 데이터셋의 분포를 보여줍니다.
 
-![데이터 분포](./assets/dataset.png)
+![데이터 분포](./code/assets/dataset.png)
 
 데이터셋은 편의성을 위해 Huggingface 에서 제공하는 datasets를 이용하여 pyarrow 형식의 데이터로 저장되어있습니다. 다음은 데이터셋의 구성입니다.
 
