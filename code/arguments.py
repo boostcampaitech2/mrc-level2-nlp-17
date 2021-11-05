@@ -9,11 +9,14 @@ class ModelArguments:
     """
 
     model_name_or_path: str = field(
-        default="klue/bert-base",
+        default="klue/roberta-large",
         metadata={
-            "help": "Path to pretrained model or model identifier from huggingface.co/models"
+            "help": "Path to pretrained model or model identifier from huggingface.co/models  klue/roberta-large klue/bert-base"
         },
     )
+
+    is_roberta: bool = field(default=True, metadata={"help": "use Reberta model"})
+
     config_name: Optional[str] = field(
         default=None,
         metadata={
@@ -27,12 +30,54 @@ class ModelArguments:
         },
     )
 
+    retrieval_model: str = field(
+        default="ElasticSearch",
+        metadata={
+            "help": "Using 'SparseRetrieval', 'DenseRetrieval', 'ElasticSearch', 'DenseAndElasticRetrieval' for retieval"
+        },
+    )
+    
+    # setting for Longformer
+
+    convert_to_longformer: bool = field(
+        default=False, # if True, make model to Longformer
+        metadata={
+            "help": "convert pretrained model to Longformer model."
+            "only use for roberta"
+            "needs : --max_seq_length 4096 --pad_to_max_length True"
+        },
+    )
+
+    model_max_length: Optional[int] = field(
+        default=4096,  # extend the position embeddings from 512 positions to max_pos. In Longformer, we set max_pos=4096
+        metadata={
+            "help": "set Maximum position for Longformer"
+       },
+    )
+    
+    attention_window: Optional[int] = field(
+        default=512,
+        metadata={
+            "help": "Size of attention window in longformer"
+        }
+    )
+
 
 @dataclass
 class DataTrainingArguments:
     """
     Arguments pertaining to what data we are going to input our model for training and eval.
     """
+
+    data_path: Optional[str] = field(
+        default="../data",
+        metadata={"help": "data path"},
+    )
+
+    context_path: Optional[str] = field(
+        default="wikipedia_documents.json",
+        metadata={"help": "data path"},
+    )
 
     dataset_name: Optional[str] = field(
         default="../data/train_dataset",
@@ -82,11 +127,48 @@ class DataTrainingArguments:
         default=64, metadata={"help": "Define how many clusters to use for faiss."}
     )
     top_k_retrieval: int = field(
-        default=1,
+        default=10,
         metadata={
             "help": "Define how many top-k passages to retrieve based on similarity."
         },
     )
     use_faiss: bool = field(
         default=False, metadata={"help": "Whether to build with faiss"}
+    )
+    do_retrieval_example: bool = field(
+        default=False, metadata={"help": "To Show retrieval example"}
+    )
+    pretrain_dense_encoder: bool = field(
+        default=False, metadata={"help": "whether to pretrain dense encoder"}
+    )
+
+    do_train_dense_retrieval: bool = field(
+        default=False, metadata={"help": "To Train Dense retrieval"}
+    )
+
+    use_pretrained_dense_encoder: bool = field(
+        default=False, metadata={"help": "use pretrained dense encoder"}
+    )
+
+    p_with_n_num: int = field(
+        default=20,
+        metadata={
+            "help": "When Train Dense retrieval, input positive and negative passage num per one question"
+        },
+    )
+    pretrain_max_dataset_num: int = field(
+        default=10000,
+        metadata={"help": "Dense Retrieval를 pretrain할 때 사용할 ict dataset의 question의 갯수"},
+    )
+
+    merge_context_num: int = field(
+        default=3,
+        metadata={"help": "top-1 부터 top-num까지 context merge한 결과를 누적하여 데이터셋으로 저장"},
+    )
+
+    do_postprocessing: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to remove ending pos starting with J in postprocessing"
+        },
     )

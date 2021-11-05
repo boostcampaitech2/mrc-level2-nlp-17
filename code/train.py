@@ -19,7 +19,11 @@ from transformers import (
 from tokenizers import Tokenizer
 from tokenizers.models import WordPiece
 
-from utils_qa import postprocess_qa_predictions, check_no_error
+from utils_qa import (
+    postprocess_qa_predictions,
+    check_no_error,
+    remove_ending_pos_starting_with_j,
+)
 from trainer_qa import QuestionAnsweringTrainer
 from retrieval import SparseRetrieval
 
@@ -27,6 +31,12 @@ from arguments import (
     ModelArguments,
     DataTrainingArguments,
 )
+
+import wandb
+import datetime
+from dateutil.tz import gettz
+
+from readers.longformer import create_long_model, copy_proj_layers
 
 
 logger = logging.getLogger(__name__)
@@ -86,6 +96,16 @@ def main():
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
         config=config,
     )
+    
+    if model_args.convert_to_longformer:
+        print(f"Pretrained Model to Longformer")
+        model, tokenizer = create_long_model(
+            model,
+            tokenizer,
+            config,
+            model_args.model_max_length,
+            model_args.attention_window
+        )
 
     print(
         type(training_args),
@@ -133,6 +153,7 @@ def run_mrc(
     def prepare_train_features(examples):
         # truncation과 padding(length가 짧을때만)을 통해 toknization을 진행하며, stride를 이용하여 overflow를 유지합니다.
         # 각 example들은 이전의 context와 조금씩 겹치게됩니다.
+
         tokenized_examples = tokenizer(
             examples[question_column_name if pad_on_right else context_column_name],
             examples[context_column_name if pad_on_right else question_column_name],
@@ -141,7 +162,7 @@ def run_mrc(
             stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            #return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            return_token_type_ids=not model_args.is_roberta,  # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 
@@ -225,6 +246,7 @@ def run_mrc(
     def prepare_validation_features(examples):
         # truncation과 padding(length가 짧을때만)을 통해 toknization을 진행하며, stride를 이용하여 overflow를 유지합니다.
         # 각 example들은 이전의 context와 조금씩 겹치게됩니다.
+
         tokenized_examples = tokenizer(
             examples[question_column_name if pad_on_right else context_column_name],
             examples[context_column_name if pad_on_right else question_column_name],
@@ -233,7 +255,7 @@ def run_mrc(
             stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            #return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            return_token_type_ids=not model_args.is_roberta,  # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 
@@ -290,8 +312,12 @@ def run_mrc(
             output_dir=training_args.output_dir,
         )
         # Metric을 구할 수 있도록 Format을 맞춰줍니다.
+        # do_postprocessing argument를 True로 설정할 경우 prediction_text의 끝 토큰이 J로 시작하는 각종 조사일 때 이를 제거하는 후처리를 수행합니다.
         formatted_predictions = [
-            {"id": k, "prediction_text": v} for k, v in predictions.items()
+            {"id": k, "prediction_text": remove_ending_pos_starting_with_j(v)}
+            if data_args.do_postprocessing
+            else {"id": k, "prediction_text": v}
+            for k, v in predictions.items()
         ]
         if training_args.do_predict:
             return formatted_predictions
@@ -311,7 +337,7 @@ def run_mrc(
         return metric.compute(predictions=p.predictions, references=p.label_ids)
 
     # Trainer 초기화
-    trainer = QuestionAnsweringTrainer( 
+    trainer = QuestionAnsweringTrainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,
@@ -323,6 +349,23 @@ def run_mrc(
         compute_metrics=compute_metrics,
     )
 
+    # wandb
+    if training_args.do_eval:
+        wandb.init(project="mrc-level2-nlp", entity="mrc17_test_korea")
+
+        # Reader | 21-10-01 00:00 | Model Name or Path
+        wandb.run.name = (
+            "Reader | "
+            + datetime.datetime.now(gettz("Asia/Seoul")).strftime("%y-%m-%d %H:%M")
+            + " | "
+            + (
+                model_args.config_name
+                if model_args.config_name is not None
+                else model_args.model_name_or_path
+            )
+        )
+        wandb.run.save()
+
     # Training
     if training_args.do_train:
         if last_checkpoint is not None:
@@ -331,6 +374,7 @@ def run_mrc(
             checkpoint = model_args.model_name_or_path
         else:
             checkpoint = None
+
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
         trainer.save_model()  # Saves the tokenizer too for easy upload
 
@@ -356,6 +400,7 @@ def run_mrc(
 
     # Evaluation
     if training_args.do_eval:
+
         logger.info("*** Evaluate ***")
         metrics = trainer.evaluate()
 

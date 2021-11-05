@@ -36,6 +36,10 @@ from arguments import (
     DataTrainingArguments,
 )
 
+import re
+from konlpy.tag import Mecab
+
+mecab = Mecab()
 
 logger = logging.getLogger(__name__)
 
@@ -282,18 +286,18 @@ def postprocess_qa_predictions(
 
         prediction_file = os.path.join(
             output_dir,
-            "predictions.json" if prefix is None else f"predictions_{prefix}".json,
+            "predictions.json" if prefix is None else f"predictions_{prefix}.json",
         )
         nbest_file = os.path.join(
             output_dir,
             "nbest_predictions.json"
             if prefix is None
-            else f"nbest_predictions_{prefix}".json,
+            else f"nbest_predictions_{prefix}.json",
         )
         if version_2_with_negative:
             null_odds_file = os.path.join(
                 output_dir,
-                "null_odds.json" if prefix is None else f"null_odds_{prefix}".json,
+                "null_odds.json" if prefix is None else f"null_odds_{prefix}.json",
             )
 
         logger.info(f"Saving predictions to {prediction_file}.")
@@ -360,3 +364,14 @@ def check_no_error(
     if "validation" not in datasets:
         raise ValueError("--do_eval requires a validation dataset")
     return last_checkpoint, max_seq_length
+
+
+# 후처리시 끝 토큰이 J로 시작하는 각종 조사들이라면, 제거합니다.
+def remove_ending_pos_starting_with_j(text):
+    pos_tagging = mecab.pos(text)
+    if pos_tagging != []:
+        ending_pos = pos_tagging[-1]
+        if "J" in ending_pos[1]:
+            text = text[: -len(ending_pos[0])]
+
+    return text

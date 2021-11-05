@@ -31,15 +31,21 @@ from transformers import (
     set_seed,
 )
 
-from utils_qa import postprocess_qa_predictions, check_no_error
+from utils_qa import (
+    postprocess_qa_predictions,
+    check_no_error,
+    remove_ending_pos_starting_with_j,
+)
 from trainer_qa import QuestionAnsweringTrainer
-from retrieval import SparseRetrieval
 
 from arguments import (
     ModelArguments,
     DataTrainingArguments,
 )
 
+from retrieval import (
+    get_retriever,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +93,7 @@ def main():
         else model_args.model_name_or_path,
         use_fast=True,
     )
+
     model = AutoModelForQuestionAnswering.from_pretrained(
         model_args.model_name_or_path,
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
@@ -95,11 +102,12 @@ def main():
 
     # True일 경우 : run passage retrieval
     if data_args.eval_retrieval:
-        datasets = run_sparse_retrieval(
-            tokenizer.tokenize,
-            datasets,
-            training_args,
-            data_args,
+        datasets = run_retrieval(
+            tokenize_fn=tokenizer.tokenize,
+            datasets=datasets,
+            training_args=training_args,
+            data_args=data_args,
+            model_args=model_args,
         )
 
     # eval or predict mrc model
@@ -107,22 +115,22 @@ def main():
         run_mrc(data_args, training_args, model_args, datasets, tokenizer, model)
 
 
-def run_sparse_retrieval(
+def run_retrieval(
     tokenize_fn: Callable[[str], List[str]],
     datasets: DatasetDict,
     training_args: TrainingArguments,
     data_args: DataTrainingArguments,
+    model_args: ModelArguments,
     data_path: str = "../data",
     context_path: str = "wikipedia_documents.json",
 ) -> DatasetDict:
 
     # Query에 맞는 Passage들을 Retrieval 합니다.
-    retriever = SparseRetrieval(
-        tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path
-    )
-    retriever.get_sparse_embedding()
+    retriever = get_retriever(model_args, data_args, training_args)
 
-    if data_args.use_faiss:
+    retriever.get_embedding()
+
+    if "build_faiss" in dir(retriever) and data_args.use_faiss:
         retriever.build_faiss(num_clusters=data_args.num_clusters)
         df = retriever.retrieve_faiss(
             datasets["validation"], topk=data_args.top_k_retrieval
@@ -190,6 +198,7 @@ def run_mrc(
     def prepare_validation_features(examples):
         # truncation과 padding(length가 짧을때만)을 통해 toknization을 진행하며, stride를 이용하여 overflow를 유지합니다.
         # 각 example들은 이전의 context와 조금씩 겹치게됩니다.
+
         tokenized_examples = tokenizer(
             examples[question_column_name if pad_on_right else context_column_name],
             examples[context_column_name if pad_on_right else question_column_name],
@@ -198,7 +207,7 @@ def run_mrc(
             stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            #return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            return_token_type_ids=not model_args.is_roberta,  # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 
@@ -259,8 +268,12 @@ def run_mrc(
             output_dir=training_args.output_dir,
         )
         # Metric을 구할 수 있도록 Format을 맞춰줍니다.
+        # do_postprocessing argument를 True로 설정할 경우 prediction_text의 끝 토큰이 J로 시작하는 각종 조사일 경우 이를 제거하는 후처리를 수행합니다.
         formatted_predictions = [
-            {"id": k, "prediction_text": v} for k, v in predictions.items()
+            {"id": k, "prediction_text": remove_ending_pos_starting_with_j(v)}
+            if data_args.do_postprocessing
+            else {"id": k, "prediction_text": v}
+            for k, v in predictions.items()
         ]
 
         if training_args.do_predict:
