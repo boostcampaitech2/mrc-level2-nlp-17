@@ -1,4 +1,6 @@
-# [NLP] Open-Domain Question Answering
+# [MRC] Open-Domain Question Answering
+
+### Boostcamp AI Tech 2기 MRC(기계독해) 팀 프로젝트 입니다.
 
 ## **"서울의 GDP는 세계 몇 위야?", "MRC가 뭐야?"**
 
@@ -41,30 +43,75 @@ bash ./install/install_requirements.sh
 
 ### 저장소 구조
 
-<img width="368" alt="Tree" src="https://user-images.githubusercontent.com/68656752/140494514-05c7875f-f1fa-4fde-a508-cfad0ad254cc.png">
+```
+mrc-level2-nlp-17/
+├──code/
+│  ├──assets/
+│  │  ├──dataset.png
+│  │  ├──EM.png
+│  │  ├──F1_score.png
+│  │  ├──ODQA1.png
+│  │  └──ODQA2.png
+│  │
+│  ├──install/
+│  │  └──install_requirements.sh
+│  │
+│  ├──ipynb/
+│  │  ├──EDA_data_processing.ipynb
+│  │  ├──EDA_mrc_trainset.ipynb
+│  │  ├──EDA_mrc_validationset.ipynb
+│  │  ├──EDA_overview.ipynb
+│  │  ├──EDA_retrieval_dataset.ipynb
+│  │  ├──create_qg_data_v1.ipynb
+│  │  ├──create_qg_data_v1.ipynb
+│  │  └──elastic_search.ipynb
+│  │
+│  ├──readers/
+│  │  └──longformer.ipynb
+│  │
+│  ├──retrievers/
+│  │  ├──DenseAndElasticRetrieval.ipynb
+│  │  ├──DenseRetrieval.ipynb
+│  │  ├──elastic_search.ipynb
+│  │  └──sparse.ipynb
+│  │
+│  ├──arguments.py
+│  ├──context_merge.py
+│  ├──get_preprocessing_dataset_for_ict.py
+│  ├──inference.py
+│  ├──retrieval.py
+│  ├──train.py
+│  ├──trainer_qa.py
+│  └──utils_qa.py
+│
+├──.gitignore    
+└──README.md
+```
+<!-- <img width="368" alt="Tree" src="https://user-images.githubusercontent.com/68656752/140494514-05c7875f-f1fa-4fde-a508-cfad0ad254cc.png"> -->
 
 - ./install/: 요구사항 설치 파일
-- retrieval.py: 여러 retreiver 모듈 로드
-- arguments.py: 실행되는 모든 argument 가 dataclass 의 형태로 저장되어있음
-- trainer_qa.py: MRC 모델 학습에 필요한 trainer 제공
-- utils_qa.py: 기타 유틸 함수 제공
-- train.py: MRC, Retrieval 모델 학습 및 평가
-- inference.py: ODQA 모델 평가 또는 제출 파일 (predictions.json) 생성
-- get_preprocessing_dataset_for_ict.py: Inverse Cloze Task를 수행하기 위한 데이터셋 생성
-- context_merge.py: 하나의 query와 k개의 context를 합친 입력을 넣은 학습
-- ./ipynb/elastic_search.ipynb: Elastis Search를 사용하기 위해 먼저 실행, 데이터 인덱싱
-- ./ipynb/create_qg_data_v1.ipynb: 위키 데이터를 이용한 question generation
-- ./ipynb/create_fold_dataset.ipynb: k-fold validation을 위한 분리 데이터 생성
 - ./ipynb/EDA_data_processing.ipynb: EDA와 전처리 데이터셋 생성
 - ./ipynb/EDA_overview.ipynb: 기본적인 EDA
 - ./ipynb/EDA_mrc_trainset.ipynb: train 데이터셋에 대한 EDA
 - ./ipynb/EDA_mrc_validationset.ipynb: validation 데이터셋에 대한 EDA
 - ./ipynb/EDA_retrieval_dataset.ipynb: wikipedia_documents.json 데이터셋에 대한 EDA
+- ./ipynb/create_fold_dataset.ipynb: k-fold validation을 위한 분리 데이터 생성
+- ./ipynb/create_qg_data_v1.ipynb: 위키 데이터를 이용한 question generation
+- ./ipynb/elastic_search.ipynb: Elastis Search를 사용하기 위해 먼저 실행, 데이터 인덱싱
 - ./readers/longformer.py: Longformer 모델 생성
-- ./retrievers/sparse.py: sparse retriever 모듈 제공
+- ./retrievers/DenseAndElasticRetrieval.py: dense retriever 와 elastic search 혼합 사용 모듈 제공
 - ./retrievers/DenseRetrieval.py: dense retriever 모듈 제공
 - ./retrievers/elastic_search.py: elastic search 모듈 제공
-- ./retrievers/DenseAndElasticRetrieval.py: dense retriever 와 elastic search 혼합 사용 모듈 제공
+- ./retrievers/sparse.py: sparse retriever 모듈 제공
+- arguments.py: 실행되는 모든 argument 가 dataclass 의 형태로 저장되어있음
+- context_merge.py: 하나의 query와 k개의 context를 합친 입력을 넣은 학습
+- get_preprocessing_dataset_for_ict.py: Inverse Cloze Task를 수행하기 위한 데이터셋 생성
+- inference.py: ODQA 모델 평가 또는 제출 파일 (predictions.json) 생성
+- retrieval.py: 여러 retreiver 모듈 로드
+- train.py: MRC, Retrieval 모델 학습 및 평가
+- trainer_qa.py: MRC 모델 학습에 필요한 trainer 제공
+- utils_qa.py: 기타 유틸 함수 제공
+
 ## 데이터 소개
 
 아래는 제공하는 데이터셋의 분포를 보여줍니다.
@@ -126,6 +173,7 @@ retrieval 과 mrc 모델의 학습이 완료되면 `inference.py` 를 이용해 
 # ODQA 실행 (test_dataset 사용)
 # wandb 가 로그인 되어있다면 자동으로 결과가 wandb 에 저장됩니다. 아니면 단순히 출력됩니다
 python inference.py --output_dir ./outputs/test_dataset/ --dataset_name ../data/test_dataset/ --model_name_or_path ./models/train_dataset/ --retrieval_model ElasticSearch --do_predict
+python inference.py --output_dir ./outputs/train_dataset/ --dataset_name ../data/train_dataset/ --model_name_or_path ./models/train_dataset/ --retrieval_model ElasticSearch --do_eval
 ```
 
 ## How to submit
