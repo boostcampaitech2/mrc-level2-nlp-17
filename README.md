@@ -1,6 +1,7 @@
 # [MRC] Open-Domain Question Answering
 
-### Boostcamp AI Tech 2기 MRC(기계독해) 팀 프로젝트 입니다.
+Boostcamp AI Tech 2기 MRC(기계 독해) 팀 프로젝트입니다.
+<br>
 
 ## **"서울의 GDP는 세계 몇 위야?", "MRC가 뭐야?"**
 
@@ -10,11 +11,15 @@
 
 ![ODQA](./code/assets/ODQA1.png)
 
+<br>
+
 본 ODQA 대회에서 우리가 만들 모델은 two-stage로 구성되어 있습니다. 첫 단계는 질문에 관련된 문서를 찾아주는 "retriever" 단계이고, 다음으로는 관련된 문서를 읽고 적절한 답변을 찾거나 만들어주는 "reader" 단계입니다. 두 가지 단계를 각각 구성하고 그것들을 적절히 통합하게 되면, 어려운 질문을 던져도 답변을 해주는 ODQA 시스템을 여러분들 손으로 직접 만들어보게 됩니다.
 
 따라서, 대회는 더 정확한 답변을 내주는 모델을 만드는 팀이 좋은 성적을 거두게 됩니다.
 
 ![ODQA](./code/assets/ODQA2.png)
+
+<br>
 
 ## 평가 방법
 두 가지 평가지표를 사용합니다.
@@ -29,6 +34,8 @@
 
 **EM 기준으로 리더보드 등수가 반영**되고, F1은 참고용으로만 활용됩니다.
 
+<br>
+
 ## 설치 방법
 
 ### 요구 사항
@@ -37,6 +44,8 @@
 # 필요한 파이썬 패키지 설치. 
 bash ./install/install_requirements.sh
 ```
+
+<br>
 
 ## 파일 구성
 
@@ -87,6 +96,7 @@ mrc-level2-nlp-17/
 ├──.gitignore    
 └──README.md
 ```
+
 <!-- <img width="368" alt="Tree" src="https://user-images.githubusercontent.com/68656752/140494514-05c7875f-f1fa-4fde-a508-cfad0ad254cc.png"> -->
 
 - ./install/: 요구사항 설치 파일
@@ -112,6 +122,8 @@ mrc-level2-nlp-17/
 - trainer_qa.py: MRC 모델 학습에 필요한 trainer 제공
 - utils_qa.py: 기타 유틸 함수 제공
 
+<br>
+
 ## 데이터 소개
 
 아래는 제공하는 데이터셋의 분포를 보여줍니다.
@@ -128,6 +140,8 @@ mrc-level2-nlp-17/
 ```
 
 data에 대한 argument 는 `arguments.py` 의 `DataTrainingArguments` 에서 확인 가능합니다. 
+
+<br>
 
 # 훈련, 평가, 추론
 
@@ -180,7 +194,9 @@ python inference.py --output_dir ./outputs/train_dataset/ --dataset_name ../data
 
 `inference.py` 파일을 위 예시처럼 `--do_predict` 으로 실행하면 `--output_dir` 위치에 `predictions.json` 이라는 파일이 생성됩니다. 해당 파일을 제출해주시면 됩니다.
 
-## Things to know
+<br>
+
+# Things to know
 
 1. `train.py` 에서 sparse embedding 을 훈련하고 저장하는 과정은 시간이 오래 걸리지 않아 따로 argument 의 default 가 True로 설정되어 있습니다. 실행 후 sparse_embedding.bin 과 tfidfv.bin 이 저장이 됩니다. **만약 sparse retrieval 관련 코드를 수정한다면, 꼭 두 파일을 지우고 다시 실행해주세요!** 안그러면 존재하는 파일이 load 됩니다.
 2. 모델의 경우 `--overwrite_cache` 를 추가하지 않으면 같은 폴더에 저장되지 않습니다. 
